@@ -5,25 +5,29 @@ import java.util.List;
 
 record MidCaptureHudSnapshot(
     String titleText,
-    String mainText,
-    String detailText,
     String statusText,
     String accentColor,
-    List<String> scoreboardLines
+    List<MidCaptureHudPlayerLine> playerLines
 ) {
     MidCaptureHudSnapshot {
-        scoreboardLines = List.copyOf(scoreboardLines);
+        playerLines = List.copyOf(playerLines);
     }
 
     @Nonnull
     static MidCaptureHudSnapshot of(
         @Nonnull String titleText,
-        @Nonnull String mainText,
-        @Nonnull String detailText,
         @Nonnull String statusText,
         @Nonnull String accentColor,
-        @Nonnull List<String> scoreboardLines
+        @Nonnull List<MidCaptureHudPlayerLine> playerLines
     ) {
-        return new MidCaptureHudSnapshot(titleText, mainText, detailText, statusText, accentColor, scoreboardLines);
+        return new MidCaptureHudSnapshot(titleText, statusText, accentColor, playerLines);
     }
+}
+
+record MidCaptureHudPlayerLine(
+    String playerName,
+    float progressRatio,
+    String progressText,
+    boolean self
+) {
 }

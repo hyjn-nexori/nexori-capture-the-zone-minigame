@@ -24,7 +24,11 @@ public final class MidCaptureHudService {
     private static final String TITLE_TEXT_COLOR = "#FFFFFF";
     private static final String DETAIL_TEXT_COLOR = "#D6E1EF";
     private static final String SCOREBOARD_TEXT_COLOR = "#EAF4FF";
-
+    private static final String CENTER_TITLE_COLOR = "#F4D26B";
+    private static final String EMPTY_STATUS_COLOR = "#F6F2E7";
+    private static final String CAPTURING_STATUS_COLOR = "#A8F0B7";
+    private static final String CONTESTED_STATUS_COLOR = "#FFD36E";
+    private static final String PREPARING_STATUS_COLOR = "#E8F1FF";
     private final MidCaptureService midCaptureService;
     private final HytaleLogger logger;
     private final ConcurrentMap<UUID, HyUIHud> activeHuds = new ConcurrentHashMap<>();
@@ -105,13 +109,13 @@ public final class MidCaptureHudService {
     private HudBuilder buildHud(@Nonnull PlayerRef playerRef, @Nonnull MidCaptureHudSnapshot state) {
         HudBuilder hud = HudBuilder.hudForPlayer(playerRef);
 
-        PanelBuilder root = PanelBuilder.panel()
-            .withId("mid-capture-root")
+        PanelBuilder centerRoot = PanelBuilder.panel()
+            .withId("mid-capture-center-root")
             .withAnchor(new HyUIAnchor()
                 .setLeft(0)
                 .setRight(0)
-                .setTop(135)
-                .setHeight(450))
+                .setTop(86)
+                .setHeight(120))
             .withHitTestVisible(false);
 
         LabelBuilder title = LabelBuilder.label()
@@ -121,43 +125,12 @@ public final class MidCaptureHudService {
                 .setLeft(0)
                 .setRight(0)
                 .setTop(0)
-                .setHeight(42))
+                .setHeight(40))
             .withHitTestVisible(false)
             .withStyle(new HyUIStyle()
-                .setFontSize(34)
+                .setFontSize(32)
                 .setRenderBold(true)
-                .setTextColor(state.accentColor())
-                .setOutlineColor("#000000")
-                .setAlignment(Alignment.Center));
-
-        LabelBuilder main = LabelBuilder.label()
-            .withId("mid-capture-main")
-            .withText(state.mainText())
-            .withAnchor(new HyUIAnchor()
-                .setLeft(0)
-                .setRight(0)
-                .setTop(48)
-                .setHeight(46))
-            .withHitTestVisible(false)
-            .withStyle(new HyUIStyle()
-                .setFontSize(42)
-                .setRenderBold(true)
-                .setTextColor(TITLE_TEXT_COLOR)
-                .setOutlineColor("#000000")
-                .setAlignment(Alignment.Center));
-
-        LabelBuilder detail = LabelBuilder.label()
-            .withId("mid-capture-detail")
-            .withText(state.detailText())
-            .withAnchor(new HyUIAnchor()
-                .setLeft(0)
-                .setRight(0)
-                .setTop(100)
-                .setHeight(28))
-            .withHitTestVisible(false)
-            .withStyle(new HyUIStyle()
-                .setFontSize(24)
-                .setTextColor(DETAIL_TEXT_COLOR)
+                .setTextColor(CENTER_TITLE_COLOR)
                 .setOutlineColor("#000000")
                 .setAlignment(Alignment.Center));
 
@@ -167,40 +140,81 @@ public final class MidCaptureHudService {
             .withAnchor(new HyUIAnchor()
                 .setLeft(0)
                 .setRight(0)
-                .setTop(132)
-                .setHeight(30))
+                .setTop(48)
+                .setHeight(44))
             .withHitTestVisible(false)
             .withStyle(new HyUIStyle()
-                .setFontSize(28)
+                .setFontSize(30)
                 .setRenderBold(true)
-                .setTextColor(state.accentColor())
+                .setTextColor(resolveStatusColor(state))
                 .setOutlineColor("#000000")
                 .setAlignment(Alignment.Center));
 
-        root.addChild(title);
-        root.addChild(main);
-        root.addChild(detail);
-        root.addChild(status);
+        centerRoot.addChild(title);
+        centerRoot.addChild(status);
 
-        int top = 186;
-        for (int index = 0; index < state.scoreboardLines().size(); index++) {
-            root.addChild(LabelBuilder.label()
-                .withId("mid-capture-score-" + index)
-                .withText(state.scoreboardLines().get(index))
+        PanelBuilder sidebarRoot = PanelBuilder.panel()
+            .withId("mid-capture-sidebar-root")
+            .withAnchor(new HyUIAnchor()
+                .setLeft(36)
+                .setTop(120)
+                .setWidth(390)
+                .setHeight(Math.max(92, 24 + (state.playerLines().size() * 48))))
+            .withHitTestVisible(false);
+
+        LabelBuilder sidebarTitle = LabelBuilder.label()
+            .withId("mid-capture-sidebar-title")
+            .withText("Capture Progress")
+            .withAnchor(new HyUIAnchor()
+                .setLeft(16)
+                .setRight(16)
+                .setTop(8)
+                .setHeight(22))
+            .withHitTestVisible(false)
+            .withStyle(new HyUIStyle()
+                .setFontSize(18)
+                .setRenderBold(true)
+                .setTextColor("#F4E8BE")
+                .setOutlineColor("#000000")
+                .setAlignment(Alignment.Start));
+        sidebarRoot.addChild(sidebarTitle);
+
+        int top = 34;
+        for (int index = 0; index < state.playerLines().size(); index++) {
+            MidCaptureHudPlayerLine line = state.playerLines().get(index);
+            int rowHeight = line.self() ? 28 : 24;
+
+            sidebarRoot.addChild(LabelBuilder.label()
+                .withId("mid-capture-player-line-" + index)
+                .withText((index + 1) + ". " + line.playerName() + " " + line.progressText())
                 .withAnchor(new HyUIAnchor()
-                    .setLeft(0)
-                    .setRight(0)
-                    .setTop(top + (index * 28))
-                    .setHeight(24))
+                    .setLeft(10)
+                    .setRight(10)
+                    .setTop(top)
+                    .setHeight(rowHeight))
                 .withHitTestVisible(false)
                 .withStyle(new HyUIStyle()
-                    .setFontSize(22)
-                    .setTextColor(SCOREBOARD_TEXT_COLOR)
+                    .setFontSize(line.self() ? 20 : 16)
+                    .setRenderBold(true)
+                    .setTextColor(line.self() ? "#F4D26B" : "#F6F2E7")
                     .setOutlineColor("#000000")
-                    .setAlignment(Alignment.Center)));
+                    .setAlignment(Alignment.Start)
+                    .setWrap(true)));
+            top += rowHeight + 4;
         }
 
-        hud.addElement(root);
+        hud.addElement(centerRoot);
+        hud.addElement(sidebarRoot);
         return hud;
+    }
+
+    @Nonnull
+    private String resolveStatusColor(@Nonnull MidCaptureHudSnapshot state) {
+        return switch (state.accentColor()) {
+            case "#9FF0A8" -> CAPTURING_STATUS_COLOR;
+            case "#FFD36E" -> CONTESTED_STATUS_COLOR;
+            case "#82C7FF" -> PREPARING_STATUS_COLOR;
+            default -> EMPTY_STATUS_COLOR;
+        };
     }
 }

@@ -159,29 +159,22 @@ public final class MidCaptureService {
             return Optional.empty();
         }
 
-        List<String> scoreboardLines = buildScoreboardLines(matchState);
-        while (scoreboardLines.size() < 8) {
-            scoreboardLines.add("");
-        }
+        List<MidCaptureHudPlayerLine> playerLines = buildPlayerLines(matchState, playerUuid);
 
         if (!matchState.isPlacementComplete()) {
             return Optional.of(MidCaptureHudSnapshot.of(
                 "MID CONTROL",
-                "Players taking positions",
-                "Capture starts after Nexori finishes the initial placement.",
                 "Placed " + matchState.getPlacedPlayers() + " / " + Math.max(matchState.getExpectedPlayers(), 1),
                 "#82C7FF",
-                scoreboardLines
+                playerLines
             ));
         }
 
         return Optional.of(MidCaptureHudSnapshot.of(
             "MID CONTROL",
-            "You " + formatProgressPercent(playerState.getCaptureProgressSeconds()),
-            "Hold the center alone to capture it.",
             buildZoneStatusText(matchState),
             resolveAccentColor(matchState),
-            scoreboardLines
+            playerLines
         ));
     }
 
@@ -590,17 +583,25 @@ public final class MidCaptureService {
     }
 
     @Nonnull
-    private List<String> buildScoreboardLines(@Nonnull MidCaptureMatchState matchState) {
+    private List<MidCaptureHudPlayerLine> buildPlayerLines(
+        @Nonnull MidCaptureMatchState matchState,
+        @Nonnull UUID viewerUuid
+    ) {
         List<MidCapturePlayerState> orderedPlayers = new ArrayList<>(matchState.getPlayersByUuid().values());
-        orderedPlayers.sort(Comparator
-            .comparingDouble(MidCapturePlayerState::getCaptureProgressSeconds).reversed()
-            .thenComparing(MidCapturePlayerState::getPlayerName, String.CASE_INSENSITIVE_ORDER));
+        orderedPlayers.sort(
+            Comparator.comparing((MidCapturePlayerState playerState) -> !playerState.getPlayerUuid().equals(viewerUuid))
+                .thenComparing(Comparator.comparingDouble(MidCapturePlayerState::getCaptureProgressSeconds).reversed())
+                .thenComparing(MidCapturePlayerState::getPlayerName, String.CASE_INSENSITIVE_ORDER)
+        );
 
-        List<String> lines = new ArrayList<>(orderedPlayers.size());
-        int index = 1;
+        List<MidCaptureHudPlayerLine> lines = new ArrayList<>(orderedPlayers.size());
         for (MidCapturePlayerState playerState : orderedPlayers) {
-            lines.add(index + ". " + playerState.getPlayerName() + "  " + formatProgressPercent(playerState.getCaptureProgressSeconds()));
-            index++;
+            lines.add(new MidCaptureHudPlayerLine(
+                playerState.getPlayerName(),
+                progressRatio(playerState.getCaptureProgressSeconds()),
+                formatProgressPercent(playerState.getCaptureProgressSeconds()),
+                playerState.getPlayerUuid().equals(viewerUuid)
+            ));
         }
         return lines;
     }
@@ -639,6 +640,10 @@ public final class MidCaptureService {
     private static String formatProgressPercent(double progressSeconds) {
         int percent = (int) Math.round((progressSeconds / MidCaptureConfig.CAPTURE_SECONDS_TO_WIN) * 100.0D);
         return Math.max(0, percent) + "%";
+    }
+
+    private static float progressRatio(double progressSeconds) {
+        return (float) Math.max(0.0D, Math.min(1.0D, progressSeconds / MidCaptureConfig.CAPTURE_SECONDS_TO_WIN));
     }
 
     public record DebugState(
