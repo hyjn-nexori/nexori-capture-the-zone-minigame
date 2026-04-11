@@ -1,22 +1,23 @@
 {
-    "Group": "Example",
-    "Name": "ExamplePlugin",
-    "Version": "0.0.2",
-    "Description": "An example plugin for HyTale!",
+    "Group": "NexoriDemo",
+    "Name": "Nexori Public API Demo",
+    "Version": "0.1.0",
+    "Description": "Third-party demo plugin used to validate Nexori's public API from a separate mod.",
     "Authors": [
         {
-            "Name": "It's you!"
+            "Name": "Janiel Nunez"
         }
     ],
-    "Website": "example.org",
-    "ServerVersion": "*",
+    "Website": "https://github.com/hyjn-nexori/nexori-public-api-demo",
+    "ServerVersion": "2026.03.26-89796e57b",
+    "TargetServerVersion": "2026.03.26-89796e57b",
     "Dependencies": {
-        
+        "Nexori:NexoriPlugin": "*"
     },
     "OptionalDependencies": {
         
     },
     "DisabledByDefault": false,
-    "Main": "org.example.plugin.ExamplePlugin",
-    "IncludesAssetPack": true
+    "Main": "io.github.hyjn.nexoridemo.NexoriPublicApiDemoPlugin",
+    "IncludesAssetPack": false
 }

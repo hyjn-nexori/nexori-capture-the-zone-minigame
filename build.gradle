@@ -1,6 +1,5 @@
 plugins {
     id 'java'
-    id 'org.jetbrains.gradle.plugin.idea-ext' version '1.3'
 }
 
 import org.gradle.internal.os.OperatingSystem
@@ -49,6 +48,15 @@ javadoc {
 // the official launcher for now.
 dependencies {
     implementation(files("$hytaleHome/install/$patchline/package/game/latest/Server/HytaleServer.jar"))
+    compileOnly(fileTree(
+        dir: "$rootDir/../nexori-plugin/build/libs",
+        include: ['nexori-plugin-*.jar'],
+        exclude: ['*-sources.jar', '*-javadoc.jar']
+    ))
+    compileOnly(fileTree(
+        dir: "$rootDir/../../hytale-servers/server2/Server/mods",
+        include: ['HyUI-*.jar']
+    ))
 }
 
 // Create the working directory to run the server if it does not already exist.
@@ -91,17 +99,6 @@ def createServerRunArguments(String srcDir) {
         programParameters += ' --mods="' + modPaths.join(',') + '"'
     }
     return programParameters
-}
-
-// Creates a run configuration in IDEA that will run the Hytale server with
-// your plugin and the default assets.
-idea.project.settings.runConfigurations {
-    'HytaleServer'(org.jetbrains.gradle.ext.Application) {
-        mainClass = 'com.hypixel.hytale.Main'
-        moduleName = project.idea.module.name + '.main'
-        programParameters = createServerRunArguments(sourceSets.main.java.srcDirs.first().parentFile.absolutePath)
-        workingDirectory = serverRunDir.absolutePath
-    }
 }
 
 // Creates a launch.json file for VSCode with the same configuration
