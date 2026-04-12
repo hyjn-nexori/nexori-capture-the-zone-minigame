@@ -1,99 +1,108 @@
-# Hytale Example Plugin
+# Nexori Public API Demo
 
-An example project that can build and run plugins for the game Hytale!
+This repository is the official example third-party mod used to validate and
+demonstrate Nexori's public minigame API from a separate plugin.
 
-> **⚠️ Warning: Early Access**    
-> The game Hytale is in early access, and so is this project! Features may be
-> incomplete, unstable, or change frequently. Please be patient and understanding as development
-> continues.
+It is not the main Nexori product.
+It is a companion demo that shows how another mod can build custom gameplay on
+top of Nexori's match launch and return flow.
 
-## Introduction
-This project contains a Gradle project that can be imported into IDEA and used
-as the foundation for custom Hytale plugins. The template will add the Hytale
-server to your classpath and create a run configuration that can be used to
-run your plugin on the server. It can also be used to build a sharable JAR file
-that contains your plugin.
+## What This Demo Proves
 
-## Requirements
-Please ensure all the requirements are met before getting started.
+The demo proves that a separate mod can:
 
-1. Download Hytale using the official launcher.
-2. Have Intellij IDEA installed. Community edition is fine.
-3. Download Java 25 and set it as the SDK in IDEA.
+- detect whether a player is inside an active Nexori match
+- wait for Nexori's initial player placement to finish
+- run custom game logic without owning Nexori internals
+- resolve player outcomes manually through the public API
+- let Nexori handle the return-to-lobby flow
 
-## Configuring Template
-It is important to configure the project before using it as a template. Doing
-this before importing the project will help avoid running into caching issues
-later on.
+## Current Example: Mid Capture
 
-### 1: Project Name
-Set the name of the project in `settings.gradle`. This should be the name of
-your plugin. We recommend capitalizing your project name and avoiding 
-whitespace and most special characters. This will be used as the base name for
-any files produced by Gradle, like the sharable JAR file.
+The demo currently implements a simple `Mid Capture` minigame:
 
-### 2: Gradle Properties
-Review the properties defined in `gradle.properties`. You should change the 
-`maven_group` to match your project. You should also change the `version`
-property before making a new release, or set up CI/CD to automate it.
+- players launch into a Nexori match instance
+- players fight for control of one center zone
+- progress builds while one player holds the zone alone
+- once a player reaches full control, the demo resolves the outcome
+- Nexori performs the delayed return flow
 
-### 3: Manifest
-The manifest file provides important information about your plugin to Hytale.
-You should update every property in this file to reflect your project. The 
-most important property to set is `Main` which tells the game which class
-file to load as the entry point for your plugin. The file can be found at 
-`src/main/resources/manifest.json`.
+The HUD in this repo is intentionally simple and focused on proving API usage,
+not on replacing a full production UI pack.
 
-**This template has configured Gradle to automatically update the `Version` and
-`IncludesAssetPack` property to reflect your Gradle properties every time you 
-run the game in development, or build the plugin. This is a workaround to allow
-the in-game asset editor to be used when working on your project.**
+## Dependency
 
-## Importing into IDEA
-When opening the project in IDEA it should automatically create the
-`HytaleServer` run configuration and a `./run` folder. When you run the game it
-will generate all the relevant files in there. It will also load the default 
-assets from the games.
+This project depends on the main Nexori plugin:
 
-**If you do not see the `HytaleServer` run configuration, you may need to open
-the dropdown or click `Edit Configurations...` once to unhide it.**
+- [nexori-plugin](https://github.com/hyjn-nexori/nexori-plugin)
 
-## Importing into VSCode
-While VSCode is not officially supported, you can generate launch configs by 
-running `./gradlew generateVSCodeLaunch`.
+The manifest dependency is:
 
-## Connecting to Server
-Once the server is running in IDEA you should be able to connect to 
-`Local Server` using your standard Hytale client. If the server does not show
-up automatically, add the IP as `127.0.0.1` manually.
-
-### You MUST authenticate your test server!
-In order to connect to the test server, you must authenticate it with Hytale.
-This is done by running the `auth login device` command in the server terminal.
-This command will print a URL that you can use to authenticate the server using
-your Hytale account. Once authenticated, you can run the 
-`auth persistence Encrypted` command to keep your server authenticated after 
-restarting it. 
-
-**Never share your encrypted auth file!**
-
-If you are unable to run commands from the IDEA terminal, you can also run the 
-command from code like this. Make sure to remove the code after your server is
-authenticated.
-
-```java
-    @Override
-    protected void start() {
-        CommandManager.get().handleCommand(ConsoleSender.INSTANCE, "auth login device");
-    }
+```json
+"Dependencies": {
+  "Nexori:NexoriPlugin": "*"
+}
 ```
 
+## Public API Story
 
-## Verifying The Example Plugin
-You can verify the Example plugin has loaded by running the `/test` command 
-in game. It will print the name and version of your plugin. This is for 
-demonstration purposes, and should **NOT** be included in your final build.
+The design goal is intentionally narrow:
 
-The example plugin also includes a recipe defined by an asset pack. This recipe
-allows you to craft 10 dirt into 1 dirt using the crafting window. This is also
-an example and should be removed before you release the plugin.
+- Nexori launches the match
+- your mod owns its gameplay rules
+- your mod decides who won or lost
+- your mod calls Nexori to resolve that outcome
+
+This demo exists to show that story clearly.
+
+## Important Interfaces
+
+The public API surface lives in the main plugin:
+
+- [NexoriMinigameApi.java](D:/JanielNunez/hyjn-nexori/nexori-plugin/src/main/java/io/github/hyjn/nexori/plugin/api/minigame/NexoriMinigameApi.java)
+
+The most important calls for this demo are:
+
+- `findActiveMatchId(...)`
+- `findActivePlayerUuid(...)`
+- `findMatchPlacementState(...)`
+- `resolvePlayerOutcome(...)`
+- `findMatchResolutionTriggerId(...)`
+
+## Project Structure
+
+Main runtime logic lives in:
+
+- [NexoriPublicApiDemoPlugin.java](D:/JanielNunez/hyjn-nexori/nexori-public-api-demo/src/main/java/io/github/hyjn/nexoridemo/NexoriPublicApiDemoPlugin.java)
+- [MidCaptureService.java](D:/JanielNunez/hyjn-nexori/nexori-public-api-demo/src/main/java/io/github/hyjn/nexoridemo/midcapture/MidCaptureService.java)
+- [MidCaptureHudService.java](D:/JanielNunez/hyjn-nexori/nexori-public-api-demo/src/main/java/io/github/hyjn/nexoridemo/midcapture/MidCaptureHudService.java)
+- [MidCaptureTickSystem.java](D:/JanielNunez/hyjn-nexori/nexori-public-api-demo/src/main/java/io/github/hyjn/nexoridemo/midcapture/MidCaptureTickSystem.java)
+
+## Build
+
+Requirements:
+
+- Java 25
+- local Hytale install
+- Nexori available on the target server
+
+Compile:
+
+```powershell
+.\gradlew.bat compileJava
+```
+
+Build:
+
+```powershell
+.\gradlew.bat build
+```
+
+## Intended Audience
+
+This repo is mainly for:
+
+- reviewers who want to see how Nexori's public API is meant to be used
+- modders who want a practical starting point for third-party match logic
+- anyone validating that Nexori can power a custom minigame without exposing
+  its internal runtime services
