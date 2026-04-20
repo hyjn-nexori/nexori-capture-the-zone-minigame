@@ -1,5 +1,6 @@
 package io.github.hyjn.nexoridemo.midcapture;
 
+import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -9,6 +10,7 @@ import com.hypixel.hytale.math.vector.Vector3i;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.data.PlayerRespawnPointData;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
@@ -23,13 +25,13 @@ import io.github.hyjn.nexori.plugin.api.minigame.NexoriResolvePlayerResult;
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 public final class MidCaptureService {
 
@@ -49,6 +51,7 @@ public final class MidCaptureService {
     public synchronized void handlePlayerTick(
         @Nonnull Ref<EntityStore> ref,
         @Nonnull Store<EntityStore> store,
+        @Nonnull CommandBuffer<EntityStore> commandBuffer,
         long nowEpochMs
     ) {
         Player player = store.getComponent(ref, Player.getComponentType());
@@ -136,8 +139,8 @@ public final class MidCaptureService {
         syncPlacementState(matchState, playerState, player, transformComponent);
 
         if (!matchState.isResolved()) {
-            handleRespawnIfNeeded(playerState, ref, store, playerRef, nowEpochMs);
-            advanceMatch(matchState, nowEpochMs);
+            handleRespawnIfNeeded(matchState, playerState, ref, store, playerRef, nowEpochMs);
+            advanceMatch(matchState, store, commandBuffer, nowEpochMs);
         } else {
             maybeLogTickExit(ref, store, nowEpochMs, "match_resolved matchId=" + matchState.getMatchId());
         }
@@ -160,13 +163,39 @@ public final class MidCaptureService {
         }
 
         List<MidCaptureHudPlayerLine> playerLines = buildPlayerLines(matchState, playerUuid);
+        String respawnPenaltyText = "Respawn: " + formatPenaltySeconds(playerState.getRespawnPenaltyMs());
+        boolean rewardVisible = playerState.getRewardNoticeUntilEpochMs() > nowEpochMs && playerState.getLastRewardAmountMs() > 0L;
+        String respawnRewardText = rewardVisible
+            ? "Kill bonus: -" + (playerState.getLastRewardAmountMs() / 1000L) + "s"
+            : "";
+        String respawnRewardColor = rewardVisible
+            ? buildRewardFadeColor(playerState.getRewardNoticeUntilEpochMs() - nowEpochMs)
+            : "#9FF0A8";
+        long respawnRemainingMs = playerState.getRespawnDueAtEpochMs() <= 0L
+            ? 0L
+            : Math.max(0L, playerState.getRespawnDueAtEpochMs() - nowEpochMs);
+
+        if (!playerState.isAlive() && respawnRemainingMs > 0L) {
+            return Optional.of(MidCaptureHudSnapshot.of(
+                "MID CONTROL",
+                "Respawn in " + formatRespawnSeconds(respawnRemainingMs),
+                "#FF7C7C",
+                playerLines,
+                respawnPenaltyText,
+                respawnRewardText,
+                respawnRewardColor
+            ));
+        }
 
         if (!matchState.isPlacementComplete()) {
             return Optional.of(MidCaptureHudSnapshot.of(
                 "MID CONTROL",
                 "Placed " + matchState.getPlacedPlayers() + " / " + Math.max(matchState.getExpectedPlayers(), 1),
                 "#82C7FF",
-                playerLines
+                playerLines,
+                respawnPenaltyText,
+                respawnRewardText,
+                respawnRewardColor
             ));
         }
 
@@ -174,7 +203,10 @@ public final class MidCaptureService {
             "MID CONTROL",
             buildZoneStatusText(matchState),
             resolveAccentColor(matchState),
-            playerLines
+            playerLines,
+            respawnPenaltyText,
+            respawnRewardText,
+            respawnRewardColor
         ));
     }
 
@@ -295,22 +327,47 @@ public final class MidCaptureService {
     }
 
     private void handleRespawnIfNeeded(
+        @Nonnull MidCaptureMatchState matchState,
         @Nonnull MidCapturePlayerState playerState,
         @Nonnull Ref<EntityStore> ref,
         @Nonnull Store<EntityStore> store,
         @Nonnull PlayerRef playerRef,
         long nowEpochMs
     ) {
-        if (store.getComponent(ref, DeathComponent.getComponentType()) == null) {
+        DeathComponent deathComponent = store.getComponent(ref, DeathComponent.getComponentType());
+        if (deathComponent == null) {
+            playerState.setRespawnDueAtEpochMs(0L);
             return;
         }
-        if (nowEpochMs - playerState.getLastRespawnAtEpochMs() < MidCaptureConfig.RESPAWN_COOLDOWN_MS) {
+
+        deathComponent.setShowDeathMenu(false);
+        deathComponent.setDisplayDataOnDeathScreen(false);
+
+        if (playerState.getRespawnDueAtEpochMs() <= 0L) {
+            applyKillRespawnReward(matchState, playerState, deathComponent, store, nowEpochMs);
+            long respawnDelayMs = Math.max(0L, playerState.getRespawnPenaltyMs());
+            playerState.setRespawnDueAtEpochMs(nowEpochMs + respawnDelayMs);
+            logger.atInfo().log(
+                "MID_CAPTURE_RESPAWN_SCHEDULED player=" + playerState.getPlayerName()
+                    + " delayMs=" + respawnDelayMs
+                    + " currentPenaltyMs=" + playerState.getRespawnPenaltyMs()
+            );
+        }
+
+        if (nowEpochMs < playerState.getRespawnDueAtEpochMs()) {
             return;
         }
 
         playerState.setLastRespawnAtEpochMs(nowEpochMs);
+        playerState.setRespawnDueAtEpochMs(0L);
         try {
             DeathComponent.respawn(store, ref);
+            playerState.setRespawnPenaltyMs(playerState.getRespawnPenaltyMs() + MidCaptureConfig.RESPAWN_DELAY_PER_DEATH_MS);
+            logger.atInfo().log(
+                "MID_CAPTURE_RESPAWN_PENALTY_INCREASED player=" + playerState.getPlayerName()
+                    + " newPenaltyMs=" + playerState.getRespawnPenaltyMs()
+                    + " addedMs=" + MidCaptureConfig.RESPAWN_DELAY_PER_DEATH_MS
+            );
         } catch (Exception exception) {
             logger.atWarning().withCause(exception).log(
                 "Failed to respawn mid-capture player " + playerRef.getUuid() + "."
@@ -318,8 +375,58 @@ public final class MidCaptureService {
         }
     }
 
+    private void applyKillRespawnReward(
+        @Nonnull MidCaptureMatchState matchState,
+        @Nonnull MidCapturePlayerState victimState,
+        @Nonnull DeathComponent deathComponent,
+        @Nonnull Store<EntityStore> store,
+        long nowEpochMs
+    ) {
+        Damage deathInfo = deathComponent.getDeathInfo();
+        if (deathInfo == null || !(deathInfo.getSource() instanceof Damage.EntitySource entitySource)) {
+            return;
+        }
+
+        Ref<EntityStore> killerEntityRef = entitySource.getRef();
+        if (killerEntityRef == null || !killerEntityRef.isValid()) {
+            return;
+        }
+
+        PlayerRef killerPlayerRef = store.getComponent(killerEntityRef, Universe.get().getPlayerRefComponentType());
+        if (killerPlayerRef == null || killerPlayerRef.getUuid() == null) {
+            return;
+        }
+        if (killerPlayerRef.getUuid().equals(victimState.getPlayerUuid())) {
+            return;
+        }
+
+        MidCapturePlayerState killerState = matchState.getPlayersByUuid().get(killerPlayerRef.getUuid());
+        if (killerState == null) {
+            return;
+        }
+
+        long previousPenaltyMs = killerState.getRespawnPenaltyMs();
+        long nextPenaltyMs = Math.max(0L, previousPenaltyMs - MidCaptureConfig.RESPAWN_KILL_REWARD_MS);
+        long rewardAppliedMs = previousPenaltyMs - nextPenaltyMs;
+        killerState.setRespawnPenaltyMs(nextPenaltyMs);
+        if (rewardAppliedMs > 0L) {
+            killerState.setLastRewardAmountMs(rewardAppliedMs);
+            killerState.setRewardNoticeUntilEpochMs(nowEpochMs + MidCaptureConfig.RESPAWN_REWARD_HUD_MS);
+        }
+
+        logger.atInfo().log(
+            "MID_CAPTURE_RESPAWN_REWARD killer=" + killerState.getPlayerName()
+                + " killerPenaltyBeforeMs=" + previousPenaltyMs
+                + " killerPenaltyAfterMs=" + nextPenaltyMs
+                + " victim=" + victimState.getPlayerName()
+                + " rewardMs=" + rewardAppliedMs
+        );
+    }
+
     private void advanceMatch(
         @Nonnull MidCaptureMatchState matchState,
+        @Nonnull Store<EntityStore> store,
+        @Nonnull CommandBuffer<EntityStore> commandBuffer,
         long nowEpochMs
     ) {
         long previousAdvanceAt = matchState.getLastAdvanceAtEpochMs();
@@ -337,18 +444,13 @@ public final class MidCaptureService {
             : Math.max(0.0D, (nowEpochMs - previousAdvanceAt) / 1000.0D);
 
         List<MidCapturePlayerState> insidePlayers = new ArrayList<>();
-        Set<UUID> insidePlayerUuids = matchState.getPlayersByUuid().values().stream()
-            .filter(playerState -> {
-                ZonePresenceEvaluation evaluation = evaluatePlayerZonePresence(matchState, playerState);
-                maybeLogZoneEvaluation(matchState, playerState, evaluation, nowEpochMs);
-                if (evaluation.counted()) {
-                    insidePlayers.add(playerState);
-                    return true;
-                }
-                return false;
-            })
-            .map(MidCapturePlayerState::getPlayerUuid)
-            .collect(Collectors.toSet());
+        for (MidCapturePlayerState playerState : matchState.getPlayersByUuid().values()) {
+            ZonePresenceEvaluation evaluation = evaluatePlayerZonePresence(matchState, playerState);
+            maybeLogZoneEvaluation(matchState, playerState, evaluation, nowEpochMs);
+            if (evaluation.counted()) {
+                insidePlayers.add(playerState);
+            }
+        }
 
         if (insidePlayers.size() == 1) {
             MidCapturePlayerState capturer = insidePlayers.get(0);
@@ -359,24 +461,14 @@ public final class MidCaptureService {
                     playerState.setCaptureProgressSeconds(clampProgress(
                         playerState.getCaptureProgressSeconds() + deltaSeconds
                     ));
-                } else {
-                    decayProgress(playerState, deltaSeconds);
                 }
             }
         } else if (insidePlayers.size() > 1) {
             matchState.setZoneState(MidCaptureZoneState.CONTESTED);
             matchState.setCapturingPlayerUuid(null);
-            for (MidCapturePlayerState playerState : matchState.getPlayersByUuid().values()) {
-                if (!insidePlayerUuids.contains(playerState.getPlayerUuid())) {
-                    decayProgress(playerState, deltaSeconds);
-                }
-            }
         } else {
             matchState.setZoneState(MidCaptureZoneState.EMPTY);
             matchState.setCapturingPlayerUuid(null);
-            for (MidCapturePlayerState playerState : matchState.getPlayersByUuid().values()) {
-                decayProgress(playerState, deltaSeconds);
-            }
         }
 
         MidCapturePlayerState winner = matchState.getPlayersByUuid().values().stream()
@@ -384,7 +476,7 @@ public final class MidCaptureService {
                 .thenComparing(MidCapturePlayerState::getPlayerName))
             .orElse(null);
         if (winner != null && winner.getCaptureProgressSeconds() >= MidCaptureConfig.CAPTURE_SECONDS_TO_WIN) {
-            resolveWinner(matchState, winner);
+            resolveWinner(matchState, commandBuffer, winner);
         }
     }
 
@@ -524,7 +616,11 @@ public final class MidCaptureService {
         );
     }
 
-    private void resolveWinner(@Nonnull MidCaptureMatchState matchState, @Nonnull MidCapturePlayerState winner) {
+    private void resolveWinner(
+        @Nonnull MidCaptureMatchState matchState,
+        @Nonnull CommandBuffer<EntityStore> commandBuffer,
+        @Nonnull MidCapturePlayerState winner
+    ) {
         matchState.setResolved(true);
         for (MidCapturePlayerState playerState : matchState.getPlayersByUuid().values()) {
             NexoriPlayerResolutionOutcome outcome = playerState.getPlayerUuid().equals(winner.getPlayerUuid())
@@ -577,6 +673,7 @@ public final class MidCaptureService {
         }
 
         matchState.getPlayersByUuid().remove(playerUuid);
+
         if (matchState.getPlayersByUuid().isEmpty()) {
             matchesById.remove(matchId);
         }
@@ -640,6 +737,32 @@ public final class MidCaptureService {
     private static String formatProgressPercent(double progressSeconds) {
         int percent = (int) Math.round((progressSeconds / MidCaptureConfig.CAPTURE_SECONDS_TO_WIN) * 100.0D);
         return Math.max(0, percent) + "%";
+    }
+
+    @Nonnull
+    private static String formatRespawnSeconds(long remainingMs) {
+        return String.format("%.1fs", remainingMs / 1000.0D);
+    }
+
+    @Nonnull
+    private static String formatPenaltySeconds(long penaltyMs) {
+        return String.format("%.1fs", penaltyMs / 1000.0D);
+    }
+
+    @Nonnull
+    private static String buildRewardFadeColor(long rewardRemainingMs) {
+        long clampedRemaining = Math.max(0L, Math.min(MidCaptureConfig.RESPAWN_REWARD_HUD_MS, rewardRemainingMs));
+        double ratio = clampedRemaining / (double) MidCaptureConfig.RESPAWN_REWARD_HUD_MS;
+        int startR = 0x9F;
+        int startG = 0xF0;
+        int startB = 0xA8;
+        int endR = 0x3A;
+        int endG = 0x55;
+        int endB = 0x3E;
+        int r = (int) Math.round(endR + ((startR - endR) * ratio));
+        int g = (int) Math.round(endG + ((startG - endG) * ratio));
+        int b = (int) Math.round(endB + ((startB - endB) * ratio));
+        return String.format("#%02X%02X%02X", r, g, b);
     }
 
     private static float progressRatio(double progressSeconds) {

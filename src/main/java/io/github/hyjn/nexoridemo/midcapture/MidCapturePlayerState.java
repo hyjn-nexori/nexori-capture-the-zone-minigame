@@ -15,6 +15,10 @@ final class MidCapturePlayerState {
     private boolean homeRespawnConfigured;
     private double captureProgressSeconds;
     private long lastRespawnAtEpochMs;
+    private long respawnDueAtEpochMs;
+    private long respawnPenaltyMs;
+    private long rewardNoticeUntilEpochMs;
+    private long lastRewardAmountMs;
     private Vector3d livePosition;
     private boolean alive = true;
 
@@ -68,6 +72,38 @@ final class MidCapturePlayerState {
 
     void setLastRespawnAtEpochMs(long lastRespawnAtEpochMs) {
         this.lastRespawnAtEpochMs = lastRespawnAtEpochMs;
+    }
+
+    long getRespawnDueAtEpochMs() {
+        return respawnDueAtEpochMs;
+    }
+
+    void setRespawnDueAtEpochMs(long respawnDueAtEpochMs) {
+        this.respawnDueAtEpochMs = respawnDueAtEpochMs;
+    }
+
+    long getRespawnPenaltyMs() {
+        return respawnPenaltyMs;
+    }
+
+    void setRespawnPenaltyMs(long respawnPenaltyMs) {
+        this.respawnPenaltyMs = respawnPenaltyMs;
+    }
+
+    long getRewardNoticeUntilEpochMs() {
+        return rewardNoticeUntilEpochMs;
+    }
+
+    void setRewardNoticeUntilEpochMs(long rewardNoticeUntilEpochMs) {
+        this.rewardNoticeUntilEpochMs = rewardNoticeUntilEpochMs;
+    }
+
+    long getLastRewardAmountMs() {
+        return lastRewardAmountMs;
+    }
+
+    void setLastRewardAmountMs(long lastRewardAmountMs) {
+        this.lastRewardAmountMs = lastRewardAmountMs;
     }
 
     @Nullable

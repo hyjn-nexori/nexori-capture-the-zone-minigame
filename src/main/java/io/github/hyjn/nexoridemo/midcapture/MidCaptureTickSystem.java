@@ -46,7 +46,7 @@ public final class MidCaptureTickSystem extends EntityTickingSystem<EntityStore>
         }
 
         long nowEpochMs = System.currentTimeMillis();
-        midCaptureService.handlePlayerTick(ref, store, nowEpochMs);
+        midCaptureService.handlePlayerTick(ref, store, commandBuffer, nowEpochMs);
         midCaptureHudService.handlePlayerTick(ref, store, nowEpochMs);
     }
 }

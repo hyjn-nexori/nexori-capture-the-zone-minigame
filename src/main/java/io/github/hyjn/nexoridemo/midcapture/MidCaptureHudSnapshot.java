@@ -7,7 +7,10 @@ record MidCaptureHudSnapshot(
     String titleText,
     String statusText,
     String accentColor,
-    List<MidCaptureHudPlayerLine> playerLines
+    List<MidCaptureHudPlayerLine> playerLines,
+    String respawnPenaltyText,
+    String respawnRewardText,
+    String respawnRewardColor
 ) {
     MidCaptureHudSnapshot {
         playerLines = List.copyOf(playerLines);
@@ -18,9 +21,20 @@ record MidCaptureHudSnapshot(
         @Nonnull String titleText,
         @Nonnull String statusText,
         @Nonnull String accentColor,
-        @Nonnull List<MidCaptureHudPlayerLine> playerLines
+        @Nonnull List<MidCaptureHudPlayerLine> playerLines,
+        @Nonnull String respawnPenaltyText,
+        @Nonnull String respawnRewardText,
+        @Nonnull String respawnRewardColor
     ) {
-        return new MidCaptureHudSnapshot(titleText, statusText, accentColor, playerLines);
+        return new MidCaptureHudSnapshot(
+            titleText,
+            statusText,
+            accentColor,
+            playerLines,
+            respawnPenaltyText,
+            respawnRewardText,
+            respawnRewardColor
+        );
     }
 }
 

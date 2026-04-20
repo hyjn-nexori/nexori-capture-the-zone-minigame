@@ -19,5 +19,5 @@
     },
     "DisabledByDefault": false,
     "Main": "io.github.hyjn.nexoridemo.NexoriPublicApiDemoPlugin",
-    "IncludesAssetPack": false
+    "IncludesAssetPack": true
 }

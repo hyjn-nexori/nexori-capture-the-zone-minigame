@@ -203,8 +203,52 @@ public final class MidCaptureHudService {
             top += rowHeight + 4;
         }
 
+        PanelBuilder respawnRoot = PanelBuilder.panel()
+            .withId("mid-capture-respawn-root")
+            .withAnchor(new HyUIAnchor()
+                .setRight(36)
+                .setTop(120)
+                .setWidth(260)
+                .setHeight(84))
+            .withHitTestVisible(false);
+
+        respawnRoot.addChild(LabelBuilder.label()
+            .withId("mid-capture-respawn-value")
+            .withText(state.respawnPenaltyText())
+            .withAnchor(new HyUIAnchor()
+                .setLeft(0)
+                .setRight(0)
+                .setTop(0)
+                .setHeight(48))
+            .withHitTestVisible(false)
+            .withStyle(new HyUIStyle()
+                .setFontSize(28)
+                .setRenderBold(true)
+                .setTextColor("#F4D26B")
+                .setOutlineColor("#000000")
+                .setAlignment(Alignment.End)));
+
+        if (!state.respawnRewardText().isBlank()) {
+            respawnRoot.addChild(LabelBuilder.label()
+                .withId("mid-capture-respawn-reward")
+                .withText(state.respawnRewardText())
+                .withAnchor(new HyUIAnchor()
+                    .setLeft(0)
+                    .setRight(0)
+                    .setTop(50)
+                    .setHeight(28))
+                .withHitTestVisible(false)
+                .withStyle(new HyUIStyle()
+                    .setFontSize(24)
+                    .setRenderBold(true)
+                    .setTextColor(state.respawnRewardColor())
+                    .setOutlineColor("#000000")
+                    .setAlignment(Alignment.End)));
+        }
+
         hud.addElement(centerRoot);
         hud.addElement(sidebarRoot);
+        hud.addElement(respawnRoot);
         return hud;
     }
 
@@ -214,6 +258,7 @@ public final class MidCaptureHudService {
             case "#9FF0A8" -> CAPTURING_STATUS_COLOR;
             case "#FFD36E" -> CONTESTED_STATUS_COLOR;
             case "#82C7FF" -> PREPARING_STATUS_COLOR;
+            case "#FF7C7C" -> "#FF7C7C";
             default -> EMPTY_STATUS_COLOR;
         };
     }
