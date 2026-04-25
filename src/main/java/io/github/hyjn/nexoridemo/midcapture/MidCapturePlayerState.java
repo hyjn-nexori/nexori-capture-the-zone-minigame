@@ -21,6 +21,7 @@ final class MidCapturePlayerState {
     private long lastRewardAmountMs;
     private Vector3d livePosition;
     private boolean alive = true;
+    private boolean respawnPagePatched;
 
     MidCapturePlayerState(@Nonnull UUID playerUuid, @Nonnull String playerName) {
         this.playerUuid = playerUuid;
@@ -121,5 +122,13 @@ final class MidCapturePlayerState {
 
     void setAlive(boolean alive) {
         this.alive = alive;
+    }
+
+    boolean isRespawnPagePatched() {
+        return respawnPagePatched;
+    }
+
+    void setRespawnPagePatched(boolean respawnPagePatched) {
+        this.respawnPagePatched = respawnPagePatched;
     }
 }

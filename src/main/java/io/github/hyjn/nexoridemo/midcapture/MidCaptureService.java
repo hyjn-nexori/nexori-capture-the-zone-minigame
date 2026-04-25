@@ -7,7 +7,11 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.vector.Transform;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3i;
+import com.hypixel.hytale.protocol.packets.interface_.CustomPage;
+import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBinding;
+import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.entities.player.pages.PageManager;
 import com.hypixel.hytale.server.core.entity.entities.player.data.PlayerRespawnPointData;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
@@ -16,6 +20,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import io.github.hyjn.nexori.plugin.api.minigame.NexoriMatchPlacementState;
 import io.github.hyjn.nexori.plugin.api.minigame.NexoriMinigameApi;
 import io.github.hyjn.nexori.plugin.api.minigame.NexoriPlayerResolutionOutcome;
@@ -36,6 +41,7 @@ import java.util.UUID;
 public final class MidCaptureService {
 
     private static final long ZONE_DEBUG_LOG_INTERVAL_MS = 3_000L;
+    private static final String RESPAWN_PAGE_CLASS_NAME = "com.hypixel.hytale.server.core.entity.entities.player.pages.RespawnPage";
 
     private final NexoriMinigameApi minigameApi;
     private final HytaleLogger logger;
@@ -335,13 +341,26 @@ public final class MidCaptureService {
         long nowEpochMs
     ) {
         DeathComponent deathComponent = store.getComponent(ref, DeathComponent.getComponentType());
+        Player player = store.getComponent(ref, Player.getComponentType());
         if (deathComponent == null) {
+            if (playerState.getRespawnDueAtEpochMs() > nowEpochMs) {
+                logger.atInfo().log(
+                    "MID_CAPTURE_RESPAWN_EXTERNAL_OR_EARLY player=" + playerState.getPlayerName()
+                        + " matchId=" + matchState.getMatchId()
+                        + " nowMs=" + nowEpochMs
+                        + " dueAtMs=" + playerState.getRespawnDueAtEpochMs()
+                        + " remainingMs=" + (playerState.getRespawnDueAtEpochMs() - nowEpochMs)
+                        + " respawnPagePatched=" + playerState.isRespawnPagePatched()
+                );
+            }
             playerState.setRespawnDueAtEpochMs(0L);
+            playerState.setRespawnPagePatched(false);
             return;
         }
 
-        deathComponent.setShowDeathMenu(false);
+        deathComponent.setShowDeathMenu(true);
         deathComponent.setDisplayDataOnDeathScreen(false);
+        patchActiveRespawnPage(ref, store, player, playerState);
 
         if (playerState.getRespawnDueAtEpochMs() <= 0L) {
             applyKillRespawnReward(matchState, playerState, deathComponent, store, nowEpochMs);
@@ -355,14 +374,34 @@ public final class MidCaptureService {
         }
 
         if (nowEpochMs < playerState.getRespawnDueAtEpochMs()) {
+            long remainingMs = playerState.getRespawnDueAtEpochMs() - nowEpochMs;
+            if (remainingMs > 0 && remainingMs <= 250L) {
+                logger.atInfo().log(
+                    "MID_CAPTURE_RESPAWN_COUNTDOWN player=" + playerState.getPlayerName()
+                        + " matchId=" + matchState.getMatchId()
+                        + " remainingMs=" + remainingMs
+                        + " dueAtMs=" + playerState.getRespawnDueAtEpochMs()
+                );
+            }
             return;
         }
 
         playerState.setLastRespawnAtEpochMs(nowEpochMs);
         playerState.setRespawnDueAtEpochMs(0L);
+        playerState.setRespawnPagePatched(false);
+        logger.atInfo().log(
+            "MID_CAPTURE_RESPAWN_TRIGGER player=" + playerState.getPlayerName()
+                + " matchId=" + matchState.getMatchId()
+                + " nowMs=" + nowEpochMs
+                + " penaltyBeforeIncreaseMs=" + playerState.getRespawnPenaltyMs()
+        );
         try {
             DeathComponent.respawn(store, ref);
             playerState.setRespawnPenaltyMs(playerState.getRespawnPenaltyMs() + MidCaptureConfig.RESPAWN_DELAY_PER_DEATH_MS);
+            long addedPenaltySeconds = Math.max(0L, MidCaptureConfig.RESPAWN_DELAY_PER_DEATH_MS / 1000L);
+            playerRef.sendMessage(Message.raw(
+                "Respawn penalty added: +" + addedPenaltySeconds + "s for your next death."
+            ));
             logger.atInfo().log(
                 "MID_CAPTURE_RESPAWN_PENALTY_INCREASED player=" + playerState.getPlayerName()
                     + " newPenaltyMs=" + playerState.getRespawnPenaltyMs()
@@ -767,6 +806,46 @@ public final class MidCaptureService {
 
     private static float progressRatio(double progressSeconds) {
         return (float) Math.max(0.0D, Math.min(1.0D, progressSeconds / MidCaptureConfig.CAPTURE_SECONDS_TO_WIN));
+    }
+
+    private void patchActiveRespawnPage(
+        @Nonnull Ref<EntityStore> ref,
+        @Nonnull Store<EntityStore> store,
+        Player player,
+        @Nonnull MidCapturePlayerState playerState
+    ) {
+        if (player == null || playerState.isRespawnPagePatched()) {
+            return;
+        }
+        PageManager pageManager = player.getPageManager();
+        if (pageManager == null || pageManager.getCustomPage() == null) {
+            return;
+        }
+        if (!RESPAWN_PAGE_CLASS_NAME.equals(pageManager.getCustomPage().getClass().getName())) {
+            return;
+        }
+
+        UICommandBuilder commands = new UICommandBuilder();
+        commands.set("#RespawnButton.Visible", false);
+        commands.set("#RespawnButton.Disabled", true);
+        commands.set("#DeathData.Visible", false);
+
+        CustomPage patch = new CustomPage(
+            RESPAWN_PAGE_CLASS_NAME,
+            false,
+            false,
+            pageManager.getCustomPage().getLifetime(),
+            commands.getCommands(),
+            new CustomUIEventBinding[0]
+        );
+        pageManager.updateCustomPage(patch);
+        playerState.setRespawnPagePatched(true);
+
+        logger.atInfo().log(
+            "MID_CAPTURE_RESPAWN_PAGE_PATCHED player=" + playerState.getPlayerName()
+                + " key=" + RESPAWN_PAGE_CLASS_NAME
+                + " hidden=[#RespawnButton,#DeathData]"
+        );
     }
 
     public record DebugState(
