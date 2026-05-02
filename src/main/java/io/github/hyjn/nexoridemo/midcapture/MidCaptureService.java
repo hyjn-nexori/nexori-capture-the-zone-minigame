@@ -22,10 +22,13 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import io.github.hyjn.nexori.plugin.api.minigame.NexoriMatchPlacementState;
+import io.github.hyjn.nexori.plugin.api.minigame.NexoriMatchCompletionStatus;
+import io.github.hyjn.nexori.plugin.api.minigame.NexoriMatchResultPlayer;
+import io.github.hyjn.nexori.plugin.api.minigame.NexoriMatchResultPlayerOutcome;
+import io.github.hyjn.nexori.plugin.api.minigame.NexoriMatchResultRequirements;
 import io.github.hyjn.nexori.plugin.api.minigame.NexoriMinigameApi;
-import io.github.hyjn.nexori.plugin.api.minigame.NexoriPlayerResolutionOutcome;
-import io.github.hyjn.nexori.plugin.api.minigame.NexoriResolvePlayerOutcome;
-import io.github.hyjn.nexori.plugin.api.minigame.NexoriResolvePlayerResult;
+import io.github.hyjn.nexori.plugin.api.minigame.NexoriSubmitMatchResultRequest;
+import io.github.hyjn.nexori.plugin.api.minigame.NexoriSubmitMatchResultResult;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
@@ -505,6 +508,13 @@ public final class MidCaptureService {
         } else if (insidePlayers.size() > 1) {
             matchState.setZoneState(MidCaptureZoneState.CONTESTED);
             matchState.setCapturingPlayerUuid(null);
+            // In this demo, contested means multiple players are on the point at once,
+            // not that capture progress should freeze.
+            for (MidCapturePlayerState playerState : insidePlayers) {
+                playerState.setCaptureProgressSeconds(clampProgress(
+                    playerState.getCaptureProgressSeconds() + deltaSeconds
+                ));
+            }
         } else {
             matchState.setZoneState(MidCaptureZoneState.EMPTY);
             matchState.setCapturingPlayerUuid(null);
@@ -661,26 +671,46 @@ public final class MidCaptureService {
         @Nonnull MidCapturePlayerState winner
     ) {
         matchState.setResolved(true);
-        for (MidCapturePlayerState playerState : matchState.getPlayersByUuid().values()) {
-            NexoriPlayerResolutionOutcome outcome = playerState.getPlayerUuid().equals(winner.getPlayerUuid())
-                ? NexoriPlayerResolutionOutcome.WIN
-                : NexoriPlayerResolutionOutcome.LOSS;
-            NexoriResolvePlayerResult result = minigameApi.resolvePlayerOutcome(
-                matchState.getMatchId(),
-                playerState.getPlayerUuid(),
-                outcome,
-                MidCaptureConfig.RETURN_DELAY_SECONDS,
-                outcome == NexoriPlayerResolutionOutcome.WIN ? "mid_capture_win" : "mid_capture_loss"
-            );
-            if (result.outcome() != NexoriResolvePlayerOutcome.UPDATED) {
-                logger.atWarning().log(
-                    "Failed to resolve mid-capture player outcome matchId=" + matchState.getMatchId()
-                        + " playerUuid=" + playerState.getPlayerUuid()
-                        + " outcome=" + outcome
-                        + " result=" + result.outcome()
-                );
-            }
+        List<UUID> requiredPlayerUuids = minigameApi.findMatchResultRequirements(matchState.getMatchId())
+            .map(NexoriMatchResultRequirements::requiredPlayerUuids)
+            .orElseGet(() -> List.copyOf(matchState.getPlayersByUuid().keySet()));
+        List<NexoriMatchResultPlayer> players = new ArrayList<>();
+        for (UUID playerUuid : requiredPlayerUuids) {
+            boolean isWinner = playerUuid.equals(winner.getPlayerUuid());
+            players.add(new NexoriMatchResultPlayer(
+                playerUuid,
+                isWinner ? NexoriMatchResultPlayerOutcome.WIN : NexoriMatchResultPlayerOutcome.LOSS,
+                isWinner ? "mid_capture_win" : "mid_capture_loss"
+            ));
         }
+        NexoriSubmitMatchResultResult result = minigameApi.submitMatchResult(new NexoriSubmitMatchResultRequest(
+            matchState.getMatchId(),
+            players,
+            "mid_capture_point_captured",
+            Map.of(
+                "mode", "mid_capture",
+                "winnerPlayerUuid", winner.getPlayerUuid().toString()
+            ),
+            MidCaptureConfig.RETURN_DELAY_SECONDS
+        ));
+        if (result.matchStatus() != NexoriMatchCompletionStatus.ACCEPTED
+            && result.matchStatus() != NexoriMatchCompletionStatus.ALREADY_SUBMITTED) {
+            logger.atWarning().log(
+                "Failed to submit mid-capture match result matchId=" + matchState.getMatchId()
+                    + " winnerPlayerUuid=" + winner.getPlayerUuid()
+                    + " matchStatus=" + result.matchStatus()
+                    + " backendReportStatus=" + result.backendReportStatus()
+                    + " message=" + result.message()
+            );
+            return;
+        }
+        logger.atInfo().log(
+            "Submitted mid-capture match result matchId=" + matchState.getMatchId()
+                + " winnerPlayerUuid=" + winner.getPlayerUuid()
+                + " matchStatus=" + result.matchStatus()
+                + " backendReportStatus=" + result.backendReportStatus()
+                + " resultId=" + result.resultId()
+        );
     }
 
     private void decayProgress(@Nonnull MidCapturePlayerState playerState, double deltaSeconds) {
