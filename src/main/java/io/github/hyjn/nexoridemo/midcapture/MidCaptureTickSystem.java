@@ -13,14 +13,14 @@ import javax.annotation.Nonnull;
 
 public final class MidCaptureTickSystem extends EntityTickingSystem<EntityStore> {
 
-    private final MidCaptureService midCaptureService;
+    private final MidCaptureMinigameService midCaptureMinigameService;
     private final MidCaptureHudService midCaptureHudService;
 
     public MidCaptureTickSystem(
-        @Nonnull MidCaptureService midCaptureService,
+        @Nonnull MidCaptureMinigameService midCaptureMinigameService,
         @Nonnull MidCaptureHudService midCaptureHudService
     ) {
-        this.midCaptureService = midCaptureService;
+        this.midCaptureMinigameService = midCaptureMinigameService;
         this.midCaptureHudService = midCaptureHudService;
     }
 
@@ -46,7 +46,7 @@ public final class MidCaptureTickSystem extends EntityTickingSystem<EntityStore>
         }
 
         long nowEpochMs = System.currentTimeMillis();
-        midCaptureService.handlePlayerTick(ref, store, commandBuffer, nowEpochMs);
+        midCaptureMinigameService.handlePlayerTick(ref, store, commandBuffer, nowEpochMs);
         midCaptureHudService.handlePlayerTick(ref, store, nowEpochMs);
     }
 }

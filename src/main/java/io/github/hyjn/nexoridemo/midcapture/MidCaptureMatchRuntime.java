@@ -2,14 +2,22 @@ package io.github.hyjn.nexoridemo.midcapture;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
-final class MidCaptureMatchState {
+final class MidCaptureMatchRuntime {
 
     private final String matchId;
-    private final Map<UUID, MidCapturePlayerState> playersByUuid = new LinkedHashMap<>();
+    private final Map<UUID, MidCapturePlayerRuntime> playersByUuid = new LinkedHashMap<>();
+    private final List<UUID> expectedPlayerUuids;
+    private final List<UUID> requiredResultPlayerUuids;
+    private final String queueId;
+    private final String arenaId;
+    private final String rulesEngineId;
+    private final String matchResolutionTriggerId;
+    private final boolean controlledByThisMod;
     private String worldName;
     private long lastAdvanceAtEpochMs;
     private boolean resolved;
@@ -20,9 +28,26 @@ final class MidCaptureMatchState {
     private MidCaptureZoneState zoneState = MidCaptureZoneState.PREPARING;
     private UUID capturingPlayerUuid;
 
-    MidCaptureMatchState(@Nonnull String matchId, @Nonnull String worldName) {
+    MidCaptureMatchRuntime(
+        @Nonnull String matchId,
+        @Nonnull String worldName,
+        @Nonnull String queueId,
+        @Nonnull String arenaId,
+        @Nonnull String rulesEngineId,
+        @Nonnull String matchResolutionTriggerId,
+        @Nonnull List<UUID> expectedPlayerUuids,
+        @Nonnull List<UUID> requiredResultPlayerUuids,
+        boolean controlledByThisMod
+    ) {
         this.matchId = matchId;
         this.worldName = worldName;
+        this.queueId = queueId;
+        this.arenaId = arenaId;
+        this.rulesEngineId = rulesEngineId;
+        this.matchResolutionTriggerId = matchResolutionTriggerId;
+        this.expectedPlayerUuids = List.copyOf(expectedPlayerUuids);
+        this.requiredResultPlayerUuids = List.copyOf(requiredResultPlayerUuids);
+        this.controlledByThisMod = controlledByThisMod;
     }
 
     @Nonnull
@@ -31,8 +56,18 @@ final class MidCaptureMatchState {
     }
 
     @Nonnull
-    Map<UUID, MidCapturePlayerState> getPlayersByUuid() {
+    Map<UUID, MidCapturePlayerRuntime> getPlayersByUuid() {
         return playersByUuid;
+    }
+
+    @Nonnull
+    List<UUID> getExpectedPlayerUuids() {
+        return expectedPlayerUuids;
+    }
+
+    @Nonnull
+    List<UUID> getRequiredResultPlayerUuids() {
+        return requiredResultPlayerUuids;
     }
 
     @Nonnull
@@ -42,6 +77,30 @@ final class MidCaptureMatchState {
 
     void setWorldName(@Nonnull String worldName) {
         this.worldName = worldName;
+    }
+
+    @Nonnull
+    String getQueueId() {
+        return queueId;
+    }
+
+    @Nonnull
+    String getArenaId() {
+        return arenaId;
+    }
+
+    @Nonnull
+    String getRulesEngineId() {
+        return rulesEngineId;
+    }
+
+    @Nonnull
+    String getMatchResolutionTriggerId() {
+        return matchResolutionTriggerId;
+    }
+
+    boolean isControlledByThisMod() {
+        return controlledByThisMod;
     }
 
     long getLastAdvanceAtEpochMs() {

@@ -29,16 +29,16 @@ public final class MidCaptureHudService {
     private static final String CAPTURING_STATUS_COLOR = "#A8F0B7";
     private static final String CONTESTED_STATUS_COLOR = "#FFD36E";
     private static final String PREPARING_STATUS_COLOR = "#E8F1FF";
-    private final MidCaptureService midCaptureService;
+    private final MidCaptureMinigameService midCaptureMinigameService;
     private final HytaleLogger logger;
     private final ConcurrentMap<UUID, HyUIHud> activeHuds = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, MidCaptureHudSnapshot> renderedStates = new ConcurrentHashMap<>();
 
     public MidCaptureHudService(
-        @Nonnull MidCaptureService midCaptureService,
+        @Nonnull MidCaptureMinigameService midCaptureMinigameService,
         @Nonnull HytaleLogger logger
     ) {
-        this.midCaptureService = midCaptureService;
+        this.midCaptureMinigameService = midCaptureMinigameService;
         this.logger = logger;
     }
 
@@ -79,7 +79,7 @@ public final class MidCaptureHudService {
             return;
         }
 
-        MidCaptureHudSnapshot nextState = midCaptureService.findHudSnapshot(playerUuid, nowEpochMs).orElse(null);
+        MidCaptureHudSnapshot nextState = midCaptureMinigameService.findHudSnapshot(playerUuid, nowEpochMs).orElse(null);
         if (nextState == null) {
             remove(playerRef);
             return;

@@ -7,7 +7,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.UUID;
 
-final class MidCapturePlayerState {
+final class MidCapturePlayerRuntime {
 
     private final UUID playerUuid;
     private String playerName;
@@ -23,7 +23,7 @@ final class MidCapturePlayerState {
     private boolean alive = true;
     private boolean respawnPagePatched;
 
-    MidCapturePlayerState(@Nonnull UUID playerUuid, @Nonnull String playerName) {
+    MidCapturePlayerRuntime(@Nonnull UUID playerUuid, @Nonnull String playerName) {
         this.playerUuid = playerUuid;
         this.playerName = playerName;
     }

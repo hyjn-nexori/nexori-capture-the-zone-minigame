@@ -6,7 +6,7 @@ import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import io.github.hyjn.nexori.plugin.api.minigame.NexoriMinigameApi;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureHudService;
-import io.github.hyjn.nexoridemo.midcapture.MidCaptureService;
+import io.github.hyjn.nexoridemo.midcapture.MidCaptureMinigameService;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureTickSystem;
 
 import javax.annotation.Nonnull;
@@ -15,7 +15,7 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
-    private MidCaptureService midCaptureService;
+    private MidCaptureMinigameService midCaptureMinigameService;
     private MidCaptureHudService midCaptureHudService;
 
     public NexoriPublicApiDemoPlugin(@Nonnull JavaPluginInit init) {
@@ -25,8 +25,8 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
     @Override
     protected void setup() {
         NexoriMinigameApi minigameApi = NexoriMinigameApiLocator.resolve();
-        this.midCaptureService = new MidCaptureService(minigameApi, this.getLogger());
-        this.midCaptureHudService = new MidCaptureHudService(this.midCaptureService, this.getLogger());
+        this.midCaptureMinigameService = new MidCaptureMinigameService(minigameApi, this.getLogger());
+        this.midCaptureHudService = new MidCaptureHudService(this.midCaptureMinigameService, this.getLogger());
 
         LOGGER.atInfo().log(
             "Setting up "
@@ -45,9 +45,9 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
             if (event.getPlayerRef() == null || event.getPlayerRef().getUuid() == null) {
                 return;
             }
-            this.midCaptureService.handlePlayerDisconnect(event.getPlayerRef().getUuid());
+            this.midCaptureMinigameService.handlePlayerDisconnect(event.getPlayerRef().getUuid());
             this.midCaptureHudService.remove(event.getPlayerRef());
         });
-        this.getEntityStoreRegistry().registerSystem(new MidCaptureTickSystem(this.midCaptureService, this.midCaptureHudService));
+        this.getEntityStoreRegistry().registerSystem(new MidCaptureTickSystem(this.midCaptureMinigameService, this.midCaptureHudService));
     }
 }
