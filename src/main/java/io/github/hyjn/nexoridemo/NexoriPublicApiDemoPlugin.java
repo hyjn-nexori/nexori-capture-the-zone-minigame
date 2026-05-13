@@ -38,6 +38,7 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
         );
 
         this.getCommandRegistry().registerCommand(new NexoriPublicApiDemoCommand(
+            minigameApi,
             this.getName(),
             this.getManifest().getVersion().toString()
         ));
