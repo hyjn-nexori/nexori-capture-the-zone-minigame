@@ -24,7 +24,8 @@ public final class NexoriPublicApiDemoCommand extends CommandBase {
     private final String pluginName;
     private final String pluginVersion;
     private final DefaultArg<String> actionArg;
-    private final OptionalArg<String> matchIdArg;
+    private final OptionalArg<String> firstArg;
+    private final OptionalArg<String> secondArg;
 
     public NexoriPublicApiDemoCommand(
         @Nonnull NexoriMinigameApi minigameApi,
@@ -37,7 +38,8 @@ public final class NexoriPublicApiDemoCommand extends CommandBase {
         this.pluginName = pluginName;
         this.pluginVersion = pluginVersion;
         this.actionArg = this.withDefaultArg("action", "Action to run.", ArgTypes.STRING, "status", "status");
-        this.matchIdArg = this.withOptionalArg("matchId", "Match id for temporary admission close tests.", ArgTypes.STRING);
+        this.firstArg = this.withOptionalArg("value", "Action value.", ArgTypes.STRING);
+        this.secondArg = this.withOptionalArg("extra", "Extra action value.", ArgTypes.STRING);
     }
 
     @Override
@@ -62,15 +64,16 @@ public final class NexoriPublicApiDemoCommand extends CommandBase {
         ctx.sendMessage(Message.raw("Nexori demo commands:"));
         ctx.sendMessage(Message.raw("- /nexoridemo status"));
         ctx.sendMessage(Message.raw("- /nexoridemo closeadmission <matchId>"));
+        ctx.sendMessage(Message.raw("- /nexoridemospectator <on|off> [matchId]"));
     }
 
     private void closeAdmission(@Nonnull CommandContext ctx) {
-        if (!ctx.provided(matchIdArg)) {
+        if (!ctx.provided(firstArg)) {
             ctx.sendMessage(Message.raw("Usage: /nexoridemo closeadmission <matchId>"));
             return;
         }
 
-        String matchId = ctx.get(matchIdArg).trim();
+        String matchId = ctx.get(firstArg).trim();
         NexoriCloseMatchAdmissionResult result = minigameApi.closeMatchAdmission(new NexoriCloseMatchAdmissionRequest(
             matchId,
             NexoriCloseMatchAdmissionReason.ADMIN_FORCED,

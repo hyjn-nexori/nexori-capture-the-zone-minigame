@@ -42,6 +42,7 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
             this.getName(),
             this.getManifest().getVersion().toString()
         ));
+        this.getCommandRegistry().registerCommand(new NexoriPublicApiSpectatorCommand(this.midCaptureMinigameService));
         this.getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, event -> {
             if (event.getPlayerRef() == null || event.getPlayerRef().getUuid() == null) {
                 return;

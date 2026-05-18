@@ -5,6 +5,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.vector.Vector3d;
+import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -14,6 +15,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.hyjn.nexori.plugin.api.minigame.NexoriActiveMatchInfo;
 import io.github.hyjn.nexori.plugin.api.minigame.NexoriMatchPlacementState;
 import io.github.hyjn.nexori.plugin.api.minigame.NexoriMinigameApi;
+import io.github.hyjn.nexori.plugin.api.minigame.NexoriSetPlayerSpectatorResult;
 
 import javax.annotation.Nonnull;
 import java.util.LinkedHashMap;
@@ -31,6 +33,7 @@ public final class MidCaptureMinigameService {
     private final Map<String, MidCaptureMatchRuntime> matchesById = new LinkedHashMap<>();
     private final Map<UUID, String> matchIdByPlayerUuid = new LinkedHashMap<>();
     private final Map<String, Long> tickExitLogAtEpochMsByKey = new LinkedHashMap<>();
+    private final Map<UUID, PendingSpectatorApiRequest> pendingSpectatorApiRequestsByPlayerUuid = new LinkedHashMap<>();
 
     public MidCaptureMinigameService(@Nonnull NexoriMinigameApi nexoriApi, @Nonnull HytaleLogger logger) {
         this.nexoriApi = nexoriApi;
@@ -62,6 +65,8 @@ public final class MidCaptureMinigameService {
             forgetPlayer(playerRef.getUuid());
             return;
         }
+
+        processPendingSpectatorApiRequest(playerRef);
 
         Optional<String> activeMatchId = nexoriApi.findActiveMatchId(playerRef.getUuid());
         if (activeMatchId.isEmpty()) {
@@ -104,7 +109,19 @@ public final class MidCaptureMinigameService {
     }
 
     public synchronized void handlePlayerDisconnect(@Nonnull UUID playerUuid) {
+        pendingSpectatorApiRequestsByPlayerUuid.remove(playerUuid);
         forgetPlayer(playerUuid);
+    }
+
+    public synchronized void enqueueSpectatorApiRequest(
+        @Nonnull UUID playerUuid,
+        boolean spectator,
+        @Nonnull String matchId
+    ) {
+        pendingSpectatorApiRequestsByPlayerUuid.put(
+            playerUuid,
+            new PendingSpectatorApiRequest(spectator, matchId.trim())
+        );
     }
 
     @Nonnull
@@ -304,6 +321,39 @@ public final class MidCaptureMinigameService {
         }
         tickExitLogAtEpochMsByKey.put(key, nowEpochMs);
         logger.atInfo().log(message);
+    }
+
+    private void processPendingSpectatorApiRequest(@Nonnull PlayerRef playerRef) {
+        PendingSpectatorApiRequest request = pendingSpectatorApiRequestsByPlayerUuid.remove(playerRef.getUuid());
+        if (request == null) {
+            return;
+        }
+
+        String matchId = request.matchId();
+        if (matchId.isBlank()) {
+            matchId = nexoriApi.findActiveMatchId(playerRef.getUuid()).orElse("");
+        }
+        if (matchId.isBlank()) {
+            playerRef.sendMessage(Message.raw("No active Nexori match found. Pass matchId explicitly if needed."));
+            return;
+        }
+
+        NexoriSetPlayerSpectatorResult result = nexoriApi.setPlayerSpectator(
+            matchId,
+            playerRef.getUuid(),
+            request.spectator(),
+            "nexori-public-api-demo spectator command"
+        );
+        String summary = "setPlayerSpectator matchId=" + result.matchId()
+            + " playerUuid=" + result.playerUuid()
+            + " spectator=" + result.spectator()
+            + " status=" + result.status()
+            + " message=" + result.message();
+        logger.atInfo().log(summary);
+        playerRef.sendMessage(Message.raw(summary));
+    }
+
+    private record PendingSpectatorApiRequest(boolean spectator, String matchId) {
     }
 
     public record DebugState(
