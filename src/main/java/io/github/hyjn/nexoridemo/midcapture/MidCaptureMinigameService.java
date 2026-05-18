@@ -25,6 +25,8 @@ import java.util.UUID;
 
 public final class MidCaptureMinigameService {
 
+    private static final String DEMO_SPECTATOR_MODEL_ID = "Pigeon";
+
     private static final long TICK_EXIT_LOG_INTERVAL_MS = 3_000L;
 
     private final NexoriMinigameApi nexoriApi;
@@ -120,7 +122,7 @@ public final class MidCaptureMinigameService {
     ) {
         pendingSpectatorApiRequestsByPlayerUuid.put(
             playerUuid,
-            new PendingSpectatorApiRequest(spectator, matchId.trim())
+            new PendingSpectatorApiRequest(spectator, matchId.trim(), spectator ? DEMO_SPECTATOR_MODEL_ID : "")
         );
     }
 
@@ -342,7 +344,8 @@ public final class MidCaptureMinigameService {
             matchId,
             playerRef.getUuid(),
             request.spectator(),
-            "nexori-public-api-demo spectator command"
+            "nexori-public-api-demo spectator command",
+            request.spectatorModelId()
         );
         String summary = "setPlayerSpectator matchId=" + result.matchId()
             + " playerUuid=" + result.playerUuid()
@@ -353,7 +356,7 @@ public final class MidCaptureMinigameService {
         playerRef.sendMessage(Message.raw(summary));
     }
 
-    private record PendingSpectatorApiRequest(boolean spectator, String matchId) {
+    private record PendingSpectatorApiRequest(boolean spectator, String matchId, String spectatorModelId) {
     }
 
     public record DebugState(
