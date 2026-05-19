@@ -20,15 +20,7 @@ import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import io.github.hyjn.nexori.plugin.api.minigame.NexoriMatchCompletionStatus;
-import io.github.hyjn.nexori.plugin.api.minigame.NexoriMatchResultPlayerOutcome;
-import io.github.hyjn.nexori.plugin.api.minigame.NexoriMinigameApi;
-import io.github.hyjn.nexori.plugin.api.minigame.NexoriReturnPlayerResult;
-import io.github.hyjn.nexori.plugin.api.minigame.NexoriReturnPlayerStatus;
-import io.github.hyjn.nexori.plugin.api.minigame.NexoriSetPlayerOutcomeResult;
-import io.github.hyjn.nexori.plugin.api.minigame.NexoriSetPlayerOutcomeStatus;
-import io.github.hyjn.nexori.plugin.api.minigame.NexoriSubmitFinalMatchResultRequest;
-import io.github.hyjn.nexori.plugin.api.minigame.NexoriSubmitFinalMatchResultResult;
+import io.github.hyjn.nexoridemo.midcapture.events.MidCaptureMatchFinishedEvent;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
@@ -46,12 +38,12 @@ final class MidCaptureRulesEngine {
     private static final String RESPAWN_PAGE_CLASS_NAME = "com.hypixel.hytale.server.core.entity.entities.player.pages.RespawnPage";
 
     private final HytaleLogger logger;
-    private final MidCaptureResultStatsService resultStatsService;
+    private final MidCaptureEventBus eventBus;
     private final Map<String, Long> zoneDebugLogAtEpochMsByKey = new LinkedHashMap<>();
 
-    MidCaptureRulesEngine(@Nonnull HytaleLogger logger) {
+    MidCaptureRulesEngine(@Nonnull HytaleLogger logger, @Nonnull MidCaptureEventBus eventBus) {
         this.logger = logger;
-        this.resultStatsService = new MidCaptureResultStatsService();
+        this.eventBus = eventBus;
     }
 
     @Nonnull
@@ -76,7 +68,6 @@ final class MidCaptureRulesEngine {
     void onPlayerTick(
         @Nonnull MidCaptureMatchRuntime match,
         @Nonnull MidCapturePlayerRuntime playerRuntime,
-        @Nonnull NexoriMinigameApi nexoriApi,
         @Nonnull Player player,
         @Nonnull Ref<EntityStore> ref,
         @Nonnull Store<EntityStore> store,
@@ -98,11 +89,10 @@ final class MidCaptureRulesEngine {
 
     void onGameTick(
         @Nonnull MidCaptureMatchRuntime match,
-        @Nonnull NexoriMinigameApi nexoriApi,
         long nowEpochMs
     ) {
         if (!match.isResolved()) {
-            advanceMatch(match, nexoriApi, nowEpochMs);
+            advanceMatch(match, nowEpochMs);
         }
     }
 
@@ -427,7 +417,6 @@ final class MidCaptureRulesEngine {
 
     private void advanceMatch(
         @Nonnull MidCaptureMatchRuntime match,
-        @Nonnull NexoriMinigameApi nexoriApi,
         long nowEpochMs
     ) {
         long previousAdvanceAt = match.getLastAdvanceAtEpochMs();
@@ -482,7 +471,7 @@ final class MidCaptureRulesEngine {
                 .thenComparing(MidCapturePlayerRuntime::getPlayerName))
             .orElse(null);
         if (winner != null && winner.getCaptureProgressSeconds() >= MidCaptureConfig.CAPTURE_SECONDS_TO_WIN) {
-            resolveWinner(match, nexoriApi, winner);
+            resolveWinner(match, winner, nowEpochMs);
         }
     }
 
@@ -605,9 +594,12 @@ final class MidCaptureRulesEngine {
 
     private void resolveWinner(
         @Nonnull MidCaptureMatchRuntime match,
-        @Nonnull NexoriMinigameApi nexoriApi,
-        @Nonnull MidCapturePlayerRuntime winner
+        @Nonnull MidCapturePlayerRuntime winner,
+        long nowEpochMs
     ) {
+        if (match.isResolved()) {
+            return;
+        }
         if (!RULES_ENGINE_ID.equals(match.getRulesEngineId())) {
             logger.atWarning().log(
                 "Failed to resolve mid-capture match result matchId=" + match.getMatchId()
@@ -617,73 +609,26 @@ final class MidCaptureRulesEngine {
             );
             return;
         }
-        List<UUID> requiredPlayerUuids = match.getRequiredResultPlayerUuids();
-        if (requiredPlayerUuids == null || requiredPlayerUuids.isEmpty()) {
+        List<UUID> participantPlayerUuids = match.getRequiredResultPlayerUuids();
+        if (participantPlayerUuids == null || participantPlayerUuids.isEmpty()) {
             logger.atWarning().log(
                 "Failed to resolve mid-capture match result matchId=" + match.getMatchId()
                     + " reason=required_players_missing"
             );
             return;
         }
-        for (UUID playerUuid : requiredPlayerUuids) {
-            boolean isWinner = playerUuid.equals(winner.getPlayerUuid());
-            NexoriSetPlayerOutcomeResult outcomeResult = nexoriApi.setPlayerOutcome(
-                match.getMatchId(),
-                playerUuid,
-                isWinner ? NexoriMatchResultPlayerOutcome.WIN : NexoriMatchResultPlayerOutcome.LOSS,
-                isWinner ? "mid_capture_win" : "mid_capture_loss"
-            );
-            if (outcomeResult.status() != NexoriSetPlayerOutcomeStatus.UPDATED) {
-                logger.atWarning().log(
-                    "Failed to store mid-capture player outcome matchId=" + match.getMatchId()
-                        + " playerUuid=" + playerUuid
-                        + " status=" + outcomeResult.status()
-                        + " message=" + outcomeResult.message()
-                );
-                return;
-            }
-        }
-
-        NexoriSubmitFinalMatchResultResult result = nexoriApi.submitFinalMatchResult(new NexoriSubmitFinalMatchResultRequest(
-            match.getMatchId(),
-            "mid_capture_point_captured",
-            resultStatsService.buildFinalResultCustomData(match, requiredPlayerUuids)
-        ));
-        if (result.matchStatus() != NexoriMatchCompletionStatus.ACCEPTED
-            && result.matchStatus() != NexoriMatchCompletionStatus.ALREADY_SUBMITTED) {
-            logger.atWarning().log(
-                "Failed to submit mid-capture match result matchId=" + match.getMatchId()
-                    + " winnerPlayerUuid=" + winner.getPlayerUuid()
-                    + " matchStatus=" + result.matchStatus()
-                    + " backendReportStatus=" + result.backendReportStatus()
-                    + " message=" + result.message()
-            );
-            return;
-        }
         match.setResolved(true);
-
-        for (UUID playerUuid : requiredPlayerUuids) {
-            NexoriReturnPlayerResult returnResult = nexoriApi.returnPlayerToLobby(
-                match.getMatchId(),
-                playerUuid,
-                MidCaptureConfig.RETURN_DELAY_SECONDS,
-                "mid_capture_match_completed"
-            );
-            if (returnResult.status() != NexoriReturnPlayerStatus.SCHEDULED) {
-                logger.atWarning().log(
-                    "Failed to schedule mid-capture return matchId=" + match.getMatchId()
-                        + " playerUuid=" + playerUuid
-                        + " status=" + returnResult.status()
-                        + " message=" + returnResult.message()
-                );
-            }
-        }
+        eventBus.publish(new MidCaptureMatchFinishedEvent(
+            match.getMatchId(),
+            winner.getPlayerUuid(),
+            participantPlayerUuids,
+            "mid_capture_point_captured",
+            nowEpochMs
+        ));
         logger.atInfo().log(
-            "Submitted mid-capture match result matchId=" + match.getMatchId()
+            "Finished mid-capture match locally matchId=" + match.getMatchId()
                 + " winnerPlayerUuid=" + winner.getPlayerUuid()
-                + " matchStatus=" + result.matchStatus()
-                + " backendReportStatus=" + result.backendReportStatus()
-                + " resultId=" + result.resultId()
+                + " participantCount=" + participantPlayerUuids.size()
         );
     }
 

@@ -5,6 +5,7 @@ import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import io.github.hyjn.nexori.plugin.api.minigame.NexoriMinigameApi;
+import io.github.hyjn.nexoridemo.midcapture.MidCaptureEventBus;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureHudService;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureMinigameService;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureTickSystem;
@@ -25,7 +26,8 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
     @Override
     protected void setup() {
         NexoriMinigameApi minigameApi = NexoriMinigameApiLocator.resolve();
-        this.midCaptureMinigameService = new MidCaptureMinigameService(minigameApi, this.getLogger());
+        MidCaptureEventBus midCaptureEventBus = new MidCaptureEventBus();
+        this.midCaptureMinigameService = new MidCaptureMinigameService(minigameApi, this.getLogger(), midCaptureEventBus);
         this.midCaptureHudService = new MidCaptureHudService(this.midCaptureMinigameService, this.getLogger());
 
         LOGGER.atInfo().log(
