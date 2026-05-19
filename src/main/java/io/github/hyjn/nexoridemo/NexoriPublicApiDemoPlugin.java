@@ -9,6 +9,7 @@ import io.github.hyjn.nexoridemo.midcapture.MidCaptureEventBus;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureHudService;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureMinigameService;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureTickSystem;
+import io.github.hyjn.nexoridemo.nexori.CaptureTheZoneNexoriIntegration;
 
 import javax.annotation.Nonnull;
 
@@ -18,6 +19,7 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
 
     private MidCaptureMinigameService midCaptureMinigameService;
     private MidCaptureHudService midCaptureHudService;
+    private CaptureTheZoneNexoriIntegration captureTheZoneNexoriIntegration;
 
     public NexoriPublicApiDemoPlugin(@Nonnull JavaPluginInit init) {
         super(init);
@@ -27,8 +29,16 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
     protected void setup() {
         NexoriMinigameApi minigameApi = NexoriMinigameApiLocator.resolve();
         MidCaptureEventBus midCaptureEventBus = new MidCaptureEventBus();
-        this.midCaptureMinigameService = new MidCaptureMinigameService(minigameApi, this.getLogger(), midCaptureEventBus);
+        this.midCaptureMinigameService = new MidCaptureMinigameService(this.getLogger(), midCaptureEventBus);
         this.midCaptureHudService = new MidCaptureHudService(this.midCaptureMinigameService, this.getLogger());
+        this.captureTheZoneNexoriIntegration = new CaptureTheZoneNexoriIntegration(
+            this.getLogger(),
+            minigameApi,
+            this.midCaptureMinigameService,
+            midCaptureEventBus,
+            "capture_the_zone"
+        );
+        this.captureTheZoneNexoriIntegration.start();
 
         LOGGER.atInfo().log(
             "Setting up "

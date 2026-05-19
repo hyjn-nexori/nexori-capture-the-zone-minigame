@@ -22,7 +22,7 @@ public final class NexoriPublicApiSpectatorCommand extends CommandBase {
     private final OptionalArg<String> matchIdArg;
 
     public NexoriPublicApiSpectatorCommand(@Nonnull MidCaptureMinigameService midCaptureMinigameService) {
-        super("nexoridemospectator", "Calls NexoriMinigameApi.setPlayerSpectator for the command sender.");
+        super("nexoridemospectator", "Publishes a Capture The Zone spectator request for the command sender.");
         this.setPermissionGroup(GameMode.Adventure);
         this.midCaptureMinigameService = midCaptureMinigameService;
         this.modeArg = this.withRequiredArg("mode", "on or off.", ArgTypes.STRING);
@@ -57,7 +57,7 @@ public final class NexoriPublicApiSpectatorCommand extends CommandBase {
             spectator,
             ctx.provided(matchIdArg) ? ctx.get(matchIdArg).trim() : ""
         );
-        ctx.sendMessage(Message.raw("Queued Nexori spectator API test. It will run on the next player world tick."));
+        ctx.sendMessage(Message.raw("Published Capture The Zone spectator request."));
     }
 
     private boolean requireOp(@Nonnull CommandContext context) {

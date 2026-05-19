@@ -5,18 +5,14 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import io.github.hyjn.nexori.plugin.api.minigame.NexoriActiveMatchInfo;
-import io.github.hyjn.nexori.plugin.api.minigame.NexoriMatchPlacementState;
-import io.github.hyjn.nexori.plugin.api.minigame.NexoriMinigameApi;
-import io.github.hyjn.nexori.plugin.api.minigame.NexoriSetPlayerSpectatorResult;
 import io.github.hyjn.nexoridemo.midcapture.events.MidCaptureMatchCreatedEvent;
+import io.github.hyjn.nexoridemo.midcapture.events.MidCapturePlayerBecameSpectatorEvent;
 import io.github.hyjn.nexoridemo.midcapture.events.MidCapturePlayerJoinedEvent;
 import io.github.hyjn.nexoridemo.midcapture.events.MidCapturePlayerLeftEvent;
 import io.github.hyjn.nexoridemo.midcapture.events.MidCaptureSessionClosedEvent;
@@ -30,29 +26,23 @@ import java.util.UUID;
 
 public final class MidCaptureMinigameService {
 
-    private static final String DEMO_SPECTATOR_MODEL_ID = "Pigeon";
-
     private static final long TICK_EXIT_LOG_INTERVAL_MS = 3_000L;
 
-    private final NexoriMinigameApi nexoriApi;
     private final MidCaptureRulesEngine rulesEngine;
     private final HytaleLogger logger;
     private final MidCaptureEventBus eventBus;
     private final Map<String, MidCaptureMatchRuntime> matchesById = new LinkedHashMap<>();
     private final Map<UUID, String> matchIdByPlayerUuid = new LinkedHashMap<>();
     private final Map<String, Long> tickExitLogAtEpochMsByKey = new LinkedHashMap<>();
-    private final Map<UUID, PendingSpectatorApiRequest> pendingSpectatorApiRequestsByPlayerUuid = new LinkedHashMap<>();
 
-    public MidCaptureMinigameService(@Nonnull NexoriMinigameApi nexoriApi, @Nonnull HytaleLogger logger) {
-        this(nexoriApi, logger, new MidCaptureEventBus());
+    public MidCaptureMinigameService(@Nonnull HytaleLogger logger) {
+        this(logger, new MidCaptureEventBus());
     }
 
     public MidCaptureMinigameService(
-        @Nonnull NexoriMinigameApi nexoriApi,
         @Nonnull HytaleLogger logger,
         @Nonnull MidCaptureEventBus eventBus
     ) {
-        this.nexoriApi = nexoriApi;
         this.logger = logger;
         this.eventBus = eventBus;
         this.rulesEngine = new MidCaptureRulesEngine(logger, eventBus);
@@ -83,20 +73,12 @@ public final class MidCaptureMinigameService {
             return;
         }
 
-        processPendingSpectatorApiRequest(playerRef);
-
-        Optional<String> activeMatchId = nexoriApi.findActiveMatchId(playerRef.getUuid());
-        if (activeMatchId.isEmpty()) {
+        MidCaptureMatchRuntime match = findMatchRuntimeForPlayer(playerRef.getUuid()).orElse(null);
+        if (match == null) {
             maybeLogTickExit(ref, store, nowEpochMs, "active_match_missing world=" + world.getName());
             forgetPlayer(playerRef.getUuid());
             return;
         }
-
-        MidCaptureMatchRuntime match = findOrCreateMatchFromNexori(activeMatchId.get(), world.getName(), ref, store, nowEpochMs).orElse(null);
-        if (match == null) {
-            return;
-        }
-        matchIdByPlayerUuid.put(playerRef.getUuid(), match.getMatchId());
         if (!match.isControlledByThisMod() || match.isResolved()) {
             return;
         }
@@ -115,7 +97,6 @@ public final class MidCaptureMinigameService {
 
         match.setWorldName(world.getName());
         MidCapturePlayerRuntime playerRuntime = addPlayerToSession(match, playerRef.getUuid(), playerRef.getUsername(), nowEpochMs);
-        syncPlacementFromNexori(match);
         if (!match.isPlacementComplete()) {
             rulesEngine.onWaitingForPlacement(match);
             return;
@@ -126,7 +107,6 @@ public final class MidCaptureMinigameService {
     }
 
     public synchronized void handlePlayerDisconnect(@Nonnull UUID playerUuid) {
-        pendingSpectatorApiRequestsByPlayerUuid.remove(playerUuid);
         forgetPlayer(playerUuid);
     }
 
@@ -135,10 +115,23 @@ public final class MidCaptureMinigameService {
         boolean spectator,
         @Nonnull String matchId
     ) {
-        pendingSpectatorApiRequestsByPlayerUuid.put(
+        if (!spectator) {
+            return;
+        }
+        String resolvedMatchId = matchId.trim();
+        if (resolvedMatchId.isBlank()) {
+            resolvedMatchId = matchIdByPlayerUuid.getOrDefault(playerUuid, "");
+        }
+        if (resolvedMatchId.isBlank()) {
+            logger.atWarning().log("Cannot publish mid-capture spectator event without a match id for player " + playerUuid + ".");
+            return;
+        }
+        eventBus.publish(new MidCapturePlayerBecameSpectatorEvent(
+            resolvedMatchId,
             playerUuid,
-            new PendingSpectatorApiRequest(spectator, matchId.trim(), spectator ? DEMO_SPECTATOR_MODEL_ID : "")
-        );
+            "nexori-public-api-demo spectator command",
+            System.currentTimeMillis()
+        ));
     }
 
     @Nonnull
@@ -193,63 +186,59 @@ public final class MidCaptureMinigameService {
     }
 
     @Nonnull
+    public synchronized void createOrUpdateSession(
+        @Nonnull MidCaptureSessionSpec sessionSpec,
+        @Nonnull String worldName,
+        long nowEpochMs
+    ) {
+        ensureMatchSession(sessionSpec, worldName, nowEpochMs);
+    }
+
+    public synchronized void addPlayerToSession(
+        @Nonnull String matchId,
+        @Nonnull UUID playerUuid,
+        @Nonnull String playerName,
+        long nowEpochMs
+    ) {
+        MidCaptureMatchRuntime match = matchesById.get(matchId);
+        if (match == null) {
+            return;
+        }
+        addPlayerToSession(match, playerUuid, playerName, nowEpochMs);
+    }
+
+    public synchronized void updatePlayerPlacementState(
+        @Nonnull String matchId,
+        int expectedPlayers,
+        int arrivedPlayers,
+        int placedPlayers,
+        boolean placementComplete
+    ) {
+        MidCaptureMatchRuntime match = matchesById.get(matchId);
+        if (match == null) {
+            return;
+        }
+        updatePlayerPlacementState(match, expectedPlayers, arrivedPlayers, placedPlayers, placementComplete);
+    }
+
+    public synchronized void closeSession(@Nonnull String matchId, @Nonnull String reason, long nowEpochMs) {
+        MidCaptureMatchRuntime match = matchesById.remove(matchId);
+        if (match == null) {
+            return;
+        }
+        for (UUID playerUuid : List.copyOf(match.getPlayersByUuid().keySet())) {
+            matchIdByPlayerUuid.remove(playerUuid);
+        }
+        eventBus.publish(new MidCaptureSessionClosedEvent(match.getMatchId(), reason, nowEpochMs));
+    }
+
+    @Nonnull
     private Optional<MidCaptureMatchRuntime> findMatchRuntimeForPlayer(@Nonnull UUID playerUuid) {
         String matchId = matchIdByPlayerUuid.get(playerUuid);
         if (matchId == null || matchId.isBlank()) {
             return Optional.empty();
         }
         return Optional.ofNullable(matchesById.get(matchId));
-    }
-
-    @Nonnull
-    private Optional<MidCaptureMatchRuntime> findOrCreateMatchFromNexori(
-        @Nonnull String matchId,
-        @Nonnull String worldName,
-        @Nonnull Ref<EntityStore> ref,
-        @Nonnull Store<EntityStore> store,
-        long nowEpochMs
-    ) {
-        MidCaptureMatchRuntime existing = matchesById.get(matchId);
-        if (existing != null) {
-            return Optional.of(existing);
-        }
-
-        MidCaptureSessionSpec sessionSpec = findNexoriSessionSpec(matchId).orElse(null);
-        if (sessionSpec == null) {
-            maybeLogTickExit(ref, store, nowEpochMs, "active_match_info_missing matchId=" + matchId);
-            return Optional.empty();
-        }
-
-        MidCaptureMatchRuntime match = ensureMatchSession(sessionSpec, worldName, nowEpochMs);
-        if (!match.isControlledByThisMod()) {
-            maybeLogTickExit(
-                ref,
-                store,
-                nowEpochMs,
-                "ignored_match matchId=" + matchId
-                    + " rulesEngineId=" + sessionSpec.rulesEngineId()
-                    + " trigger=" + sessionSpec.matchResolutionTriggerId()
-                    + " expectedRulesEngineId=" + rulesEngine.rulesEngineId()
-            );
-        }
-        return Optional.of(match);
-    }
-
-    @Nonnull
-    private Optional<MidCaptureSessionSpec> findNexoriSessionSpec(@Nonnull String matchId) {
-        NexoriActiveMatchInfo activeMatchInfo = nexoriApi.findActiveMatchInfo(matchId).orElse(null);
-        if (activeMatchInfo == null) {
-            return Optional.empty();
-        }
-        return Optional.of(new MidCaptureSessionSpec(
-            activeMatchInfo.matchId(),
-            activeMatchInfo.queueId(),
-            activeMatchInfo.arenaId(),
-            activeMatchInfo.rulesEngineId(),
-            activeMatchInfo.matchResolutionTriggerId(),
-            activeMatchInfo.expectedPlayerUuids(),
-            activeMatchInfo.requiredResultPlayerUuids()
-        ));
     }
 
     @Nonnull
@@ -317,25 +306,6 @@ public final class MidCaptureMinigameService {
             ));
         }
         return runtime;
-    }
-
-    private void syncPlacementFromNexori(@Nonnull MidCaptureMatchRuntime match) {
-        if (match.isPlacementComplete()) {
-            return;
-        }
-
-        NexoriMatchPlacementState placementState = nexoriApi.findMatchPlacementState(match.getMatchId()).orElse(null);
-        if (placementState == null) {
-            return;
-        }
-
-        updatePlayerPlacementState(
-            match,
-            placementState.expectedPlayers(),
-            placementState.arrivedPlayers(),
-            placementState.placedPlayers(),
-            placementState.placementComplete()
-        );
     }
 
     private void updatePlayerPlacementState(
@@ -423,41 +393,7 @@ public final class MidCaptureMinigameService {
         logger.atInfo().log(message);
     }
 
-    private void processPendingSpectatorApiRequest(@Nonnull PlayerRef playerRef) {
-        PendingSpectatorApiRequest request = pendingSpectatorApiRequestsByPlayerUuid.remove(playerRef.getUuid());
-        if (request == null) {
-            return;
-        }
-
-        String matchId = request.matchId();
-        if (matchId.isBlank()) {
-            matchId = nexoriApi.findActiveMatchId(playerRef.getUuid()).orElse("");
-        }
-        if (matchId.isBlank()) {
-            playerRef.sendMessage(Message.raw("No active Nexori match found. Pass matchId explicitly if needed."));
-            return;
-        }
-
-        NexoriSetPlayerSpectatorResult result = nexoriApi.setPlayerSpectator(
-            matchId,
-            playerRef.getUuid(),
-            request.spectator(),
-            "nexori-public-api-demo spectator command",
-            request.spectatorModelId()
-        );
-        String summary = "setPlayerSpectator matchId=" + result.matchId()
-            + " playerUuid=" + result.playerUuid()
-            + " spectator=" + result.spectator()
-            + " status=" + result.status()
-            + " message=" + result.message();
-        logger.atInfo().log(summary);
-        playerRef.sendMessage(Message.raw(summary));
-    }
-
-    private record PendingSpectatorApiRequest(boolean spectator, String matchId, String spectatorModelId) {
-    }
-
-    private record MidCaptureSessionSpec(
+    public record MidCaptureSessionSpec(
         String matchId,
         String queueId,
         String arenaId,
@@ -467,7 +403,7 @@ public final class MidCaptureMinigameService {
         List<UUID> requiredResultPlayerUuids
     ) {
 
-        private MidCaptureSessionSpec {
+        public MidCaptureSessionSpec {
             expectedPlayerUuids = List.copyOf(expectedPlayerUuids);
             requiredResultPlayerUuids = List.copyOf(requiredResultPlayerUuids);
         }
