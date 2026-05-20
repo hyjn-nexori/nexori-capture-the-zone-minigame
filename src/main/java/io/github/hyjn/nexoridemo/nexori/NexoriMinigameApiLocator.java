@@ -1,12 +1,14 @@
-package io.github.hyjn.nexoridemo;
+package io.github.hyjn.nexoridemo.nexori;
 
 import com.hypixel.hytale.common.plugin.PluginIdentifier;
+import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.plugin.PluginBase;
 import com.hypixel.hytale.server.core.plugin.PluginManager;
 import io.github.hyjn.nexori.plugin.NexoriPlugin;
 import io.github.hyjn.nexori.plugin.api.minigame.NexoriMinigameApi;
 
 import javax.annotation.Nonnull;
+import java.util.Optional;
 
 final class NexoriMinigameApiLocator {
 
@@ -16,11 +18,12 @@ final class NexoriMinigameApiLocator {
     }
 
     @Nonnull
-    static NexoriMinigameApi resolve() {
+    static Optional<NexoriMinigameApi> resolveOptional(@Nonnull HytaleLogger logger) {
         PluginBase plugin = PluginManager.get().getPlugin(NEXORI_PLUGIN_ID);
         if (!(plugin instanceof NexoriPlugin nexoriPlugin)) {
-            throw new IllegalStateException("Could not resolve Nexori plugin dependency " + NEXORI_PLUGIN_ID + ".");
+            logger.atInfo().log("Nexori plugin dependency " + NEXORI_PLUGIN_ID + " is not available.");
+            return Optional.empty();
         }
-        return nexoriPlugin.getMinigameApi();
+        return Optional.of(nexoriPlugin.getMinigameApi());
     }
 }

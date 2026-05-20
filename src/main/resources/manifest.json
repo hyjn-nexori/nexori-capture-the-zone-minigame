@@ -12,10 +12,10 @@
     "ServerVersion": "2026.03.26-89796e57b",
     "TargetServerVersion": "2026.03.26-89796e57b",
     "Dependencies": {
-        "Nexori:NexoriPlugin": "*"
+        
     },
     "OptionalDependencies": {
-        
+        "Nexori:NexoriPlugin": "*"
     },
     "DisabledByDefault": false,
     "Main": "io.github.hyjn.nexoridemo.NexoriPublicApiDemoPlugin",

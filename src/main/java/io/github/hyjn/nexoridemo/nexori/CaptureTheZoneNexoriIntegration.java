@@ -30,6 +30,7 @@ import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -58,6 +59,30 @@ public final class CaptureTheZoneNexoriIntegration implements AutoCloseable {
         this.midCaptureService = midCaptureService;
         this.eventBus = eventBus;
         this.rulesEngineId = rulesEngineId;
+    }
+
+    @Nonnull
+    public static AutoCloseable startIfAvailable(
+        @Nonnull HytaleLogger logger,
+        @Nonnull MidCaptureMinigameService service,
+        @Nonnull MidCaptureEventBus eventBus,
+        @Nonnull String rulesEngineId
+    ) {
+        Optional<NexoriMinigameApi> resolvedApi = NexoriMinigameApiLocator.resolveOptional(logger);
+        if (resolvedApi.isEmpty()) {
+            logger.atInfo().log("Capture The Zone running in passive mode; Nexori API was not resolved.");
+            return () -> {
+            };
+        }
+        CaptureTheZoneNexoriIntegration integration = new CaptureTheZoneNexoriIntegration(
+            logger,
+            resolvedApi.get(),
+            service,
+            eventBus,
+            rulesEngineId
+        );
+        integration.start();
+        return integration;
     }
 
     public synchronized void start() {

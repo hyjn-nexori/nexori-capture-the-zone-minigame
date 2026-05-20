@@ -4,14 +4,14 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
-import io.github.hyjn.nexori.plugin.api.minigame.NexoriMinigameApi;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureEventBus;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureHudService;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureMinigameService;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureTickSystem;
-import io.github.hyjn.nexoridemo.nexori.CaptureTheZoneNexoriIntegration;
 
 import javax.annotation.Nonnull;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
 
@@ -19,7 +19,7 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
 
     private MidCaptureMinigameService midCaptureMinigameService;
     private MidCaptureHudService midCaptureHudService;
-    private CaptureTheZoneNexoriIntegration captureTheZoneNexoriIntegration;
+    private AutoCloseable nexoriIntegrationRegistration;
 
     public NexoriPublicApiDemoPlugin(@Nonnull JavaPluginInit init) {
         super(init);
@@ -27,33 +27,19 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
 
     @Override
     protected void setup() {
-        NexoriMinigameApi minigameApi = NexoriMinigameApiLocator.resolve();
         MidCaptureEventBus midCaptureEventBus = new MidCaptureEventBus();
         this.midCaptureMinigameService = new MidCaptureMinigameService(this.getLogger(), midCaptureEventBus);
         this.midCaptureHudService = new MidCaptureHudService(this.midCaptureMinigameService, this.getLogger());
-        this.captureTheZoneNexoriIntegration = new CaptureTheZoneNexoriIntegration(
-            this.getLogger(),
-            minigameApi,
-            this.midCaptureMinigameService,
-            midCaptureEventBus,
-            "capture_the_zone"
-        );
-        this.captureTheZoneNexoriIntegration.start();
+        this.nexoriIntegrationRegistration = startNexoriIntegrationIfAvailable(midCaptureEventBus);
 
         LOGGER.atInfo().log(
             "Setting up "
                 + this.getName()
                 + " v"
                 + this.getManifest().getVersion().toString()
-                + " against Nexori API type "
-                + NexoriMinigameApi.class.getName()
+                + "."
         );
 
-        this.getCommandRegistry().registerCommand(new NexoriPublicApiDemoCommand(
-            minigameApi,
-            this.getName(),
-            this.getManifest().getVersion().toString()
-        ));
         this.getCommandRegistry().registerCommand(new NexoriPublicApiSpectatorCommand(this.midCaptureMinigameService));
         this.getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, event -> {
             if (event.getPlayerRef() == null || event.getPlayerRef().getUuid() == null) {
@@ -63,5 +49,39 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
             this.midCaptureHudService.remove(event.getPlayerRef());
         });
         this.getEntityStoreRegistry().registerSystem(new MidCaptureTickSystem(this.midCaptureMinigameService, this.midCaptureHudService));
+    }
+
+    @Nonnull
+    private AutoCloseable startNexoriIntegrationIfAvailable(@Nonnull MidCaptureEventBus midCaptureEventBus) {
+        try {
+            Class<?> integrationClass = Class.forName("io.github.hyjn.nexoridemo.nexori.CaptureTheZoneNexoriIntegration");
+            Method method = integrationClass.getMethod(
+                "startIfAvailable",
+                HytaleLogger.class,
+                MidCaptureMinigameService.class,
+                MidCaptureEventBus.class,
+                String.class
+            );
+            Object result = method.invoke(
+                null,
+                this.getLogger(),
+                this.midCaptureMinigameService,
+                midCaptureEventBus,
+                "capture_the_zone"
+            );
+            if (result instanceof AutoCloseable closeable) {
+                return closeable;
+            }
+            LOGGER.atWarning().log("Capture The Zone Nexori integration factory returned no close handle; running in passive mode.");
+        } catch (ClassNotFoundException | LinkageError exception) {
+            LOGGER.atInfo().log("Capture The Zone running in passive mode; Nexori integration is not available.");
+        } catch (InvocationTargetException exception) {
+            Throwable cause = exception.getCause() == null ? exception : exception.getCause();
+            LOGGER.atWarning().withCause(cause).log("Failed to start Capture The Zone Nexori integration; running in passive mode.");
+        } catch (ReflectiveOperationException exception) {
+            LOGGER.atWarning().withCause(exception).log("Failed to reflect Capture The Zone Nexori integration; running in passive mode.");
+        }
+        return () -> {
+        };
     }
 }
