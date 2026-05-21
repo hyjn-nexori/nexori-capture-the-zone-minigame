@@ -1,4 +1,4 @@
-# Nexori Public API Demo
+# Nexori Capture The Zone Minigame
 
 This repository is the official example third-party mod used to validate and
 demonstrate Nexori's public minigame API from a separate plugin.
@@ -73,10 +73,10 @@ The most important calls for this demo are:
 
 Main runtime logic lives in:
 
-- [NexoriPublicApiDemoPlugin.java](D:/JanielNunez/hyjn-nexori/nexori-public-api-demo/src/main/java/io/github/hyjn/nexoridemo/NexoriPublicApiDemoPlugin.java)
-- [MidCaptureService.java](D:/JanielNunez/hyjn-nexori/nexori-public-api-demo/src/main/java/io/github/hyjn/nexoridemo/midcapture/MidCaptureService.java)
-- [MidCaptureHudService.java](D:/JanielNunez/hyjn-nexori/nexori-public-api-demo/src/main/java/io/github/hyjn/nexoridemo/midcapture/MidCaptureHudService.java)
-- [MidCaptureTickSystem.java](D:/JanielNunez/hyjn-nexori/nexori-public-api-demo/src/main/java/io/github/hyjn/nexoridemo/midcapture/MidCaptureTickSystem.java)
+- [NexoriPublicApiDemoPlugin.java](D:/JanielNunez/hyjn-nexori/nexori-capture-the-zone-minigame/src/main/java/io/github/hyjn/nexoridemo/NexoriPublicApiDemoPlugin.java)
+- [MidCaptureService.java](D:/JanielNunez/hyjn-nexori/nexori-capture-the-zone-minigame/src/main/java/io/github/hyjn/nexoridemo/midcapture/MidCaptureService.java)
+- [MidCaptureHudService.java](D:/JanielNunez/hyjn-nexori/nexori-capture-the-zone-minigame/src/main/java/io/github/hyjn/nexoridemo/midcapture/MidCaptureHudService.java)
+- [MidCaptureTickSystem.java](D:/JanielNunez/hyjn-nexori/nexori-capture-the-zone-minigame/src/main/java/io/github/hyjn/nexoridemo/midcapture/MidCaptureTickSystem.java)
 
 ## Build
 

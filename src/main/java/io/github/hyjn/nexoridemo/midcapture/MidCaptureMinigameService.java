@@ -132,7 +132,7 @@ public final class MidCaptureMinigameService {
         eventBus.publish(new MidCapturePlayerBecameSpectatorEvent(
             resolvedMatchId,
             playerUuid,
-            "nexori-public-api-demo spectator command",
+            "nexori-capture-the-zone-minigame spectator command",
             System.currentTimeMillis()
         ));
     }

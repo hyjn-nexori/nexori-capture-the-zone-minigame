@@ -77,7 +77,7 @@ public final class NexoriPublicApiDemoCommand extends CommandBase {
         NexoriCloseMatchAdmissionResult result = minigameApi.closeMatchAdmission(new NexoriCloseMatchAdmissionRequest(
             matchId,
             NexoriCloseMatchAdmissionReason.ADMIN_FORCED,
-            "Temporary nexori-public-api-demo command test."
+            "Temporary nexori-capture-the-zone-minigame command test."
         ));
         String summary = "closeMatchAdmission matchId=" + result.matchId()
             + " status=" + result.status()

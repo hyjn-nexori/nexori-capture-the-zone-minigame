@@ -43,16 +43,17 @@ javadoc {
     options.addStringOption('Xdoclint:-missing', '-quiet')
 }
 
+repositories {
+    mavenCentral()
+    maven { url = uri("https://jitpack.io") }
+}
+
 // Adds the Hytale server as a build dependency, allowing you to reference and
 // compile against their code. This requires you to have Hytale installed using
 // the official launcher for now.
 dependencies {
     implementation(files("$hytaleHome/install/$patchline/package/game/latest/Server/HytaleServer.jar"))
-    compileOnly(fileTree(
-        dir: "$rootDir/../nexori-plugin/build/libs",
-        include: ['nexori-plugin-*.jar'],
-        exclude: ['*-sources.jar', '*-javadoc.jar']
-    ))
+    compileOnly("com.github.hyjn-nexori:nexori-api:v2.4.0")
     compileOnly(fileTree(
         dir: "$rootDir/../../hytale-servers/server2/Server/mods",
         include: ['HyUI-*.jar']

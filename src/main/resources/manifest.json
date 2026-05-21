@@ -1,6 +1,6 @@
 {
     "Group": "NexoriDemo",
-    "Name": "Nexori Public API Demo",
+    "Name": "Nexori Capture The Zone Minigame",
     "Version": "0.1.0",
     "Description": "Third-party demo plugin used to validate Nexori's public API from a separate mod.",
     "Authors": [
@@ -8,7 +8,7 @@
             "Name": "Janiel Nunez"
         }
     ],
-    "Website": "https://github.com/hyjn-nexori/nexori-public-api-demo",
+    "Website": "https://github.com/hyjn-nexori/nexori-capture-the-zone-minigame",
     "ServerVersion": "2026.03.26-89796e57b",
     "TargetServerVersion": "2026.03.26-89796e57b",
     "Dependencies": {
