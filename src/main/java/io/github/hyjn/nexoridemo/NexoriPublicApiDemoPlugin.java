@@ -6,7 +6,9 @@ import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureEventBus;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureHudService;
+import io.github.hyjn.nexoridemo.midcapture.MidCaptureIntegrationHandle;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureMinigameService;
+import io.github.hyjn.nexoridemo.midcapture.MidCaptureStandaloneDriver;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureTickSystem;
 
 import javax.annotation.Nonnull;
@@ -19,7 +21,8 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
 
     private MidCaptureMinigameService midCaptureMinigameService;
     private MidCaptureHudService midCaptureHudService;
-    private AutoCloseable nexoriIntegrationRegistration;
+    private MidCaptureIntegrationHandle nexoriIntegrationRegistration = MidCaptureIntegrationHandle.inactive();
+    private MidCaptureStandaloneDriver standaloneDriver;
 
     public NexoriPublicApiDemoPlugin(@Nonnull JavaPluginInit init) {
         super(init);
@@ -31,6 +34,11 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
         this.midCaptureMinigameService = new MidCaptureMinigameService(this.getLogger(), midCaptureEventBus);
         this.midCaptureHudService = new MidCaptureHudService(this.midCaptureMinigameService, this.getLogger());
         this.nexoriIntegrationRegistration = startNexoriIntegrationIfAvailable(midCaptureEventBus);
+        this.standaloneDriver = new MidCaptureStandaloneDriver(
+            this.getLogger(),
+            this.midCaptureMinigameService,
+            () -> this.nexoriIntegrationRegistration.active()
+        );
 
         LOGGER.atInfo().log(
             "Setting up "
@@ -41,6 +49,7 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
         );
 
         this.getCommandRegistry().registerCommand(new NexoriPublicApiSpectatorCommand(this.midCaptureMinigameService));
+        this.getCommandRegistry().registerCommand(new MidCaptureLocalCommand(this.standaloneDriver));
         this.getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, event -> {
             if (event.getPlayerRef() == null || event.getPlayerRef().getUuid() == null) {
                 return;
@@ -52,7 +61,7 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
     }
 
     @Nonnull
-    private AutoCloseable startNexoriIntegrationIfAvailable(@Nonnull MidCaptureEventBus midCaptureEventBus) {
+    private MidCaptureIntegrationHandle startNexoriIntegrationIfAvailable(@Nonnull MidCaptureEventBus midCaptureEventBus) {
         try {
             Class<?> integrationClass = Class.forName("io.github.hyjn.nexoridemo.nexori.CaptureTheZoneNexoriIntegration");
             Method method = integrationClass.getMethod(
@@ -69,8 +78,8 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
                 midCaptureEventBus,
                 "capture_the_zone"
             );
-            if (result instanceof AutoCloseable closeable) {
-                return closeable;
+            if (result instanceof MidCaptureIntegrationHandle handle) {
+                return handle;
             }
             LOGGER.atWarning().log("Capture The Zone Nexori integration factory returned no close handle; running in passive mode.");
         } catch (ClassNotFoundException | LinkageError exception) {
@@ -81,7 +90,6 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
         } catch (ReflectiveOperationException exception) {
             LOGGER.atWarning().withCause(exception).log("Failed to reflect Capture The Zone Nexori integration; running in passive mode.");
         }
-        return () -> {
-        };
+        return MidCaptureIntegrationHandle.inactive();
     }
 }

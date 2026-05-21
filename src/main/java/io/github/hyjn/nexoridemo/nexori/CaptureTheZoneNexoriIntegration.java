@@ -21,6 +21,7 @@ import io.github.hyjn.nexori.plugin.api.minigame.NexoriSubmitFinalMatchResultReq
 import io.github.hyjn.nexori.plugin.api.minigame.NexoriSubmitFinalMatchResultResult;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureConfig;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureEventBus;
+import io.github.hyjn.nexoridemo.midcapture.MidCaptureIntegrationHandle;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureListenerRegistration;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureMinigameService;
 import io.github.hyjn.nexoridemo.midcapture.events.MidCaptureMatchFinishedEvent;
@@ -34,7 +35,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-public final class CaptureTheZoneNexoriIntegration implements AutoCloseable {
+public final class CaptureTheZoneNexoriIntegration implements MidCaptureIntegrationHandle {
 
     private final HytaleLogger logger;
     private final NexoriMinigameApi nexoriApi;
@@ -62,7 +63,7 @@ public final class CaptureTheZoneNexoriIntegration implements AutoCloseable {
     }
 
     @Nonnull
-    public static AutoCloseable startIfAvailable(
+    public static MidCaptureIntegrationHandle startIfAvailable(
         @Nonnull HytaleLogger logger,
         @Nonnull MidCaptureMinigameService service,
         @Nonnull MidCaptureEventBus eventBus,
@@ -71,8 +72,7 @@ public final class CaptureTheZoneNexoriIntegration implements AutoCloseable {
         Optional<NexoriMinigameApi> resolvedApi = NexoriMinigameApiLocator.resolveOptional(logger);
         if (resolvedApi.isEmpty()) {
             logger.atInfo().log("Capture The Zone running in passive mode; Nexori API was not resolved.");
-            return () -> {
-            };
+            return MidCaptureIntegrationHandle.inactive();
         }
         CaptureTheZoneNexoriIntegration integration = new CaptureTheZoneNexoriIntegration(
             logger,
@@ -83,6 +83,11 @@ public final class CaptureTheZoneNexoriIntegration implements AutoCloseable {
         );
         integration.start();
         return integration;
+    }
+
+    @Override
+    public synchronized boolean active() {
+        return started && !closed;
     }
 
     public synchronized void start() {

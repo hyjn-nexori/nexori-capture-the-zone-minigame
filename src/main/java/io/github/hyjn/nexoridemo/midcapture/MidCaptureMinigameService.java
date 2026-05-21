@@ -83,7 +83,10 @@ public final class MidCaptureMinigameService {
             return;
         }
 
-        String expectedWorldName = MidCaptureConfig.buildInstanceWorldName(match.getMatchId());
+        String expectedWorldName = match.getWorldName();
+        if (expectedWorldName.isBlank()) {
+            expectedWorldName = MidCaptureConfig.buildInstanceWorldName(match.getMatchId());
+        }
         if (!world.getName().equalsIgnoreCase(expectedWorldName)) {
             maybeLogTickExit(
                 ref,
