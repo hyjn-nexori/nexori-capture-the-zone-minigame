@@ -15,6 +15,7 @@ import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import javax.annotation.Nonnull;
+import java.util.Collection;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -59,7 +60,21 @@ public final class MidCaptureHudService {
         if (playerUuid == null) {
             return;
         }
+        remove(playerUuid);
+    }
 
+    public void removeAll(@Nonnull Collection<UUID> playerUuids) {
+        if (playerUuids == null || playerUuids.isEmpty()) {
+            return;
+        }
+        for (UUID playerUuid : playerUuids) {
+            if (playerUuid != null) {
+                remove(playerUuid);
+            }
+        }
+    }
+
+    private void remove(@Nonnull UUID playerUuid) {
         renderedStates.remove(playerUuid);
         HyUIHud hud = activeHuds.remove(playerUuid);
         if (hud == null) {

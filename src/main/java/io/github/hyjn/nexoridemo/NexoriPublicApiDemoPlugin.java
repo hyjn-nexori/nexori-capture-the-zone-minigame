@@ -10,6 +10,7 @@ import io.github.hyjn.nexoridemo.midcapture.MidCaptureIntegrationHandle;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureMinigameService;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureStandaloneDriver;
 import io.github.hyjn.nexoridemo.midcapture.MidCaptureTickSystem;
+import io.github.hyjn.nexoridemo.midcapture.events.MidCaptureSessionClosedEvent;
 
 import javax.annotation.Nonnull;
 import java.lang.reflect.InvocationTargetException;
@@ -33,6 +34,7 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
         MidCaptureEventBus midCaptureEventBus = new MidCaptureEventBus();
         this.midCaptureMinigameService = new MidCaptureMinigameService(this.getLogger(), midCaptureEventBus);
         this.midCaptureHudService = new MidCaptureHudService(this.midCaptureMinigameService, this.getLogger());
+        midCaptureEventBus.register(MidCaptureSessionClosedEvent.class, event -> this.midCaptureHudService.removeAll(event.playerUuids()));
         this.nexoriIntegrationRegistration = startNexoriIntegrationIfAvailable(midCaptureEventBus);
         this.standaloneDriver = new MidCaptureStandaloneDriver(
             this.getLogger(),

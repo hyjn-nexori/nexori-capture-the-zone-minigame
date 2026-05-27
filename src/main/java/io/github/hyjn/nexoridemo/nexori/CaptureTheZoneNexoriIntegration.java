@@ -282,6 +282,12 @@ public final class CaptureTheZoneNexoriIntegration implements MidCaptureIntegrat
         }
 
         @Override
+        public void onMatchCancellationRequested(@Nonnull NexoriMatchLifecycleEvent event) {
+            logger.atInfo().log("Observed Nexori match cancellation request for CTZ matchId=" + event.matchId() + ".");
+            midCaptureService.closeSession(event.matchId(), "NEXORI_MATCH_CANCELLATION_REQUESTED", event.eventAtEpochMs());
+        }
+
+        @Override
         public void onMatchCompleted(@Nonnull NexoriMatchLifecycleEvent event) {
             logger.atInfo().log("Observed Nexori match completed for CTZ matchId=" + event.matchId() + ".");
         }

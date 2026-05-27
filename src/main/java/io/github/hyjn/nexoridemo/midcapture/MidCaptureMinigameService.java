@@ -229,10 +229,11 @@ public final class MidCaptureMinigameService {
         if (match == null) {
             return;
         }
-        for (UUID playerUuid : List.copyOf(match.getPlayersByUuid().keySet())) {
+        List<UUID> playerUuids = List.copyOf(match.getPlayersByUuid().keySet());
+        for (UUID playerUuid : playerUuids) {
             matchIdByPlayerUuid.remove(playerUuid);
         }
-        eventBus.publish(new MidCaptureSessionClosedEvent(match.getMatchId(), reason, nowEpochMs));
+        eventBus.publish(new MidCaptureSessionClosedEvent(match.getMatchId(), reason, playerUuids, nowEpochMs));
     }
 
     @Nonnull
@@ -364,6 +365,7 @@ public final class MidCaptureMinigameService {
         eventBus.publish(new MidCaptureSessionClosedEvent(
             match.getMatchId(),
             "SESSION_EMPTY",
+            List.of(),
             nowEpochMs
         ));
     }
