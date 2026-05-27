@@ -1,6 +1,5 @@
 package io.github.hyjn.nexoridemo;
 
-import com.hypixel.hytale.protocol.GameMode;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
@@ -33,7 +32,7 @@ public final class NexoriPublicApiDemoCommand extends CommandBase {
         @Nonnull String pluginVersion
     ) {
         super("nexoridemo", "Shows the current Nexori public API demo plugin status and runs temporary API checks.");
-        this.setPermissionGroup(GameMode.Adventure);
+        this.setPermissionGroups("OP");
         this.minigameApi = minigameApi;
         this.pluginName = pluginName;
         this.pluginVersion = pluginVersion;
@@ -85,5 +84,10 @@ public final class NexoriPublicApiDemoCommand extends CommandBase {
             + " message=" + result.message();
         LOGGER.atInfo().log(summary);
         ctx.sendMessage(Message.raw(summary));
+    }
+
+    @Override
+    protected boolean canGeneratePermission() {
+        return false;
     }
 }

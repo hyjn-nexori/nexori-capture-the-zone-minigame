@@ -28,6 +28,11 @@ public final class MidCaptureLocalCommand extends AbstractPlayerCommand {
     }
 
     @Override
+    protected boolean canGeneratePermission() {
+        return false;
+    }
+
+    @Override
     protected void execute(
         @Nonnull CommandContext context,
         @Nonnull Store<EntityStore> store,

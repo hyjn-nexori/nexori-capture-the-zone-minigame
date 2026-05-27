@@ -1,11 +1,11 @@
 package io.github.hyjn.nexoridemo.midcapture;
 
 import com.hypixel.hytale.math.vector.Transform;
-import com.hypixel.hytale.math.vector.Vector3d;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.UUID;
+import org.joml.Vector3d;
 
 final class MidCapturePlayerRuntime {
 

@@ -48,12 +48,26 @@ repositories {
     maven { url = uri("https://jitpack.io") }
 }
 
+def nexoriApiJars = fileTree("$rootDir/../nexori-api/build/libs") {
+    include 'nexori-api-*.jar'
+    exclude '*-sources.jar'
+    exclude '*-javadoc.jar'
+}
+
+def resolveNexoriApiJar = {
+    def jars = nexoriApiJars.files.sort { -it.lastModified() }
+    if (jars.isEmpty()) {
+        throw new GradleException("No nexori-api jar found in $rootDir/../nexori-api/build/libs. Run build-nexori-api.bat first.")
+    }
+    jars.first()
+}
+
 // Adds the Hytale server as a build dependency, allowing you to reference and
 // compile against their code. This requires you to have Hytale installed using
 // the official launcher for now.
 dependencies {
     implementation(files("$hytaleHome/install/$patchline/package/game/latest/Server/HytaleServer.jar"))
-    compileOnly("com.github.hyjn-nexori:nexori-api:v2.4.0")
+    compileOnly(files(resolveNexoriApiJar()))
     compileOnly(fileTree(
         dir: "$rootDir/../../hytale-servers/server2/Server/mods",
         include: ['HyUI-*.jar']

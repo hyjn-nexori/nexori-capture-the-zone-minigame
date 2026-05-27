@@ -5,8 +5,6 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.vector.Transform;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3i;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPage;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBinding;
 import com.hypixel.hytale.server.core.Message;
@@ -29,6 +27,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.joml.Vector3d;
+import org.joml.Vector3i;
 
 final class MidCaptureRulesEngine {
 
@@ -80,7 +80,7 @@ final class MidCaptureRulesEngine {
             return;
         }
 
-        updateLivePlayerState(match, playerRuntime, player, playerRef, transformComponent, store, ref, nowEpochMs);
+        updateLivePlayerState(match, playerRuntime, playerRef, transformComponent, store, ref, nowEpochMs);
         configureHomeRespawnIfNeeded(match, playerRuntime, player, transformComponent);
         if (!match.isResolved()) {
             handleRespawnIfNeeded(match, playerRuntime, ref, store, playerRef, nowEpochMs);
@@ -97,10 +97,10 @@ final class MidCaptureRulesEngine {
     }
 
     boolean isInsideCaptureZone(@Nonnull Vector3d position) {
-        return Math.abs(position.getX() - MidCaptureConfig.CAPTURE_CENTER_X) <= MidCaptureConfig.CAPTURE_RADIUS_XZ
-            && Math.abs(position.getZ() - MidCaptureConfig.CAPTURE_CENTER_Z) <= MidCaptureConfig.CAPTURE_RADIUS_XZ
-            && position.getY() >= MidCaptureConfig.CAPTURE_MIN_Y
-            && position.getY() <= MidCaptureConfig.CAPTURE_MAX_Y;
+        return Math.abs(position.x - MidCaptureConfig.CAPTURE_CENTER_X) <= MidCaptureConfig.CAPTURE_RADIUS_XZ
+            && Math.abs(position.z - MidCaptureConfig.CAPTURE_CENTER_Z) <= MidCaptureConfig.CAPTURE_RADIUS_XZ
+            && position.y >= MidCaptureConfig.CAPTURE_MIN_Y
+            && position.y <= MidCaptureConfig.CAPTURE_MAX_Y;
     }
 
     @Nonnull
@@ -215,7 +215,6 @@ final class MidCaptureRulesEngine {
     private void updateLivePlayerState(
         @Nonnull MidCaptureMatchRuntime match,
         @Nonnull MidCapturePlayerRuntime playerRuntime,
-        @Nonnull Player player,
         @Nonnull PlayerRef playerRef,
         @Nonnull TransformComponent transformComponent,
         @Nonnull Store<EntityStore> store,
@@ -223,17 +222,11 @@ final class MidCaptureRulesEngine {
         long nowEpochMs
     ) {
         Transform playerRefTransform = playerRef.getTransform();
-        TransformComponent playerEntityTransformComponent = player.getTransformComponent();
-        Vector3d positionFromStoreComponent = transformComponent.getPosition() == null ? null : transformComponent.getPosition().clone();
-        Vector3d positionFromPlayerEntity = playerEntityTransformComponent == null || playerEntityTransformComponent.getPosition() == null
-            ? null
-            : playerEntityTransformComponent.getPosition().clone();
+        Vector3d positionFromStoreComponent = transformComponent.getPosition() == null ? null : new Vector3d(transformComponent.getPosition());
         Vector3d positionFromPlayerRef = playerRefTransform == null || playerRefTransform.getPosition() == null
             ? null
-            : playerRefTransform.getPosition().clone();
-        Vector3d chosenLivePosition = positionFromPlayerEntity != null
-            ? positionFromPlayerEntity
-            : (positionFromStoreComponent != null ? positionFromStoreComponent : positionFromPlayerRef);
+            : new Vector3d(playerRefTransform.getPosition());
+        Vector3d chosenLivePosition = positionFromStoreComponent != null ? positionFromStoreComponent : positionFromPlayerRef;
         playerRuntime.setLivePosition(chosenLivePosition);
         playerRuntime.setAlive(store.getComponent(ref, DeathComponent.getComponentType()) == null);
         maybeLogPositionSources(
@@ -241,7 +234,7 @@ final class MidCaptureRulesEngine {
             match.getMatchId(),
             nowEpochMs,
             positionFromStoreComponent,
-            positionFromPlayerEntity,
+            null,
             positionFromPlayerRef,
             chosenLivePosition
         );
@@ -274,11 +267,11 @@ final class MidCaptureRulesEngine {
         @Nonnull String worldName,
         @Nonnull Transform homeSpawn
     ) {
-        Vector3d position = homeSpawn.getPosition().clone();
+        Vector3d position = new Vector3d(homeSpawn.getPosition());
         Vector3i blockPosition = new Vector3i(
-            (int) Math.floor(position.getX()),
-            (int) Math.floor(position.getY()),
-            (int) Math.floor(position.getZ())
+            (int) Math.floor(position.x),
+            (int) Math.floor(position.y),
+            (int) Math.floor(position.z)
         );
         PlayerRespawnPointData respawnPoint = new PlayerRespawnPointData(blockPosition, position, MidCaptureConfig.HOME_RESPAWN_NAME);
         player.getPlayerConfigData().getPerWorldData(worldName).setRespawnPoints(new PlayerRespawnPointData[] {respawnPoint});
@@ -495,7 +488,7 @@ final class MidCaptureRulesEngine {
         TransformComponent liveTransformComponent = playerStore.getComponent(playerEntityRef, TransformComponent.getComponentType());
         Vector3d liveRefPosition = liveTransformComponent == null || liveTransformComponent.getPosition() == null
             ? null
-            : liveTransformComponent.getPosition().clone();
+            : new Vector3d(liveTransformComponent.getPosition());
         if (player == null || player.getWorld() == null) {
             return new ZonePresenceEvaluation(false, geometryInside, "player_world_missing", positionText);
         }
@@ -505,7 +498,7 @@ final class MidCaptureRulesEngine {
         }
 
         if (liveTransformComponent != null && liveTransformComponent.getPosition() != null) {
-            position = liveTransformComponent.getPosition().clone();
+            position = new Vector3d(liveTransformComponent.getPosition());
             positionText = position.toString();
             geometryInside = isInsideCaptureZone(position);
         }

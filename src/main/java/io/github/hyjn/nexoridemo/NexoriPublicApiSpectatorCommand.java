@@ -1,6 +1,5 @@
 package io.github.hyjn.nexoridemo;
 
-import com.hypixel.hytale.protocol.GameMode;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.arguments.system.OptionalArg;
@@ -23,7 +22,7 @@ public final class NexoriPublicApiSpectatorCommand extends CommandBase {
 
     public NexoriPublicApiSpectatorCommand(@Nonnull MidCaptureMinigameService midCaptureMinigameService) {
         super("nexoridemospectator", "Publishes a Capture The Zone spectator request for the command sender.");
-        this.setPermissionGroup(GameMode.Adventure);
+        this.setPermissionGroups("OP");
         this.midCaptureMinigameService = midCaptureMinigameService;
         this.modeArg = this.withRequiredArg("mode", "on or off.", ArgTypes.STRING);
         this.matchIdArg = this.withOptionalArg("matchId", "Optional active Nexori match id.", ArgTypes.STRING);
@@ -85,6 +84,11 @@ public final class NexoriPublicApiSpectatorCommand extends CommandBase {
                 return true;
             }
         }
+        return false;
+    }
+
+    @Override
+    protected boolean canGeneratePermission() {
         return false;
     }
 }
