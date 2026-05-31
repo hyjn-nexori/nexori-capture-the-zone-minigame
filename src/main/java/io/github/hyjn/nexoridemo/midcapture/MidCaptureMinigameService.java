@@ -33,6 +33,7 @@ public final class MidCaptureMinigameService {
     private final MidCaptureEventBus eventBus;
     private final Map<String, MidCaptureMatchRuntime> matchesById = new LinkedHashMap<>();
     private final Map<UUID, String> matchIdByPlayerUuid = new LinkedHashMap<>();
+    private final Map<UUID, String> pendingPlacementMatchIdByPlayerUuid = new LinkedHashMap<>();
     private final Map<String, Long> tickExitLogAtEpochMsByKey = new LinkedHashMap<>();
 
     public MidCaptureMinigameService(@Nonnull HytaleLogger logger) {
@@ -69,6 +70,9 @@ public final class MidCaptureMinigameService {
         World world = player.getWorld();
         if (world == null) {
             maybeLogTickExit(ref, store, nowEpochMs, "world_missing");
+            if (hasPendingPlacement(playerRef.getUuid())) {
+                return;
+            }
             forgetPlayer(playerRef.getUuid());
             return;
         }
@@ -76,6 +80,9 @@ public final class MidCaptureMinigameService {
         MidCaptureMatchRuntime match = findMatchRuntimeForPlayer(playerRef.getUuid()).orElse(null);
         if (match == null) {
             maybeLogTickExit(ref, store, nowEpochMs, "active_match_missing world=" + world.getName());
+            if (hasPendingPlacement(playerRef.getUuid())) {
+                return;
+            }
             forgetPlayer(playerRef.getUuid());
             return;
         }
@@ -94,6 +101,9 @@ public final class MidCaptureMinigameService {
                 nowEpochMs,
                 "world_mismatch matchId=" + match.getMatchId() + " current=" + world.getName() + " expected=" + expectedWorldName
             );
+            if (!match.isPlacementComplete() || hasPendingPlacement(playerRef.getUuid())) {
+                return;
+            }
             forgetPlayer(playerRef.getUuid());
             return;
         }
@@ -210,6 +220,22 @@ public final class MidCaptureMinigameService {
         addPlayerToSession(match, playerUuid, playerName, nowEpochMs);
     }
 
+    public synchronized void markPlayerPlacementPending(
+        @Nonnull String matchId,
+        @Nonnull UUID playerUuid,
+        long nowEpochMs
+    ) {
+        String normalizedMatchId = matchId.trim();
+        if (normalizedMatchId.isBlank()) {
+            return;
+        }
+        MidCaptureMatchRuntime match = matchesById.get(normalizedMatchId);
+        if (match == null || match.getPlayersByUuid().containsKey(playerUuid)) {
+            return;
+        }
+        pendingPlacementMatchIdByPlayerUuid.put(playerUuid, normalizedMatchId);
+    }
+
     public synchronized void updatePlayerPlacementState(
         @Nonnull String matchId,
         int expectedPlayers,
@@ -233,6 +259,7 @@ public final class MidCaptureMinigameService {
         for (UUID playerUuid : playerUuids) {
             matchIdByPlayerUuid.remove(playerUuid);
         }
+        pendingPlacementMatchIdByPlayerUuid.entrySet().removeIf(entry -> entry.getValue().equals(match.getMatchId()));
         eventBus.publish(new MidCaptureSessionClosedEvent(match.getMatchId(), reason, playerUuids, nowEpochMs));
     }
 
@@ -257,15 +284,13 @@ public final class MidCaptureMinigameService {
             return existing;
         }
 
-        boolean controlledByThisMod = rulesEngine.rulesEngineId().equals(sessionSpec.rulesEngineId())
-            && isManualResolutionTrigger(sessionSpec.matchResolutionTriggerId());
+        boolean controlledByThisMod = rulesEngine.rulesEngineId().equals(sessionSpec.rulesEngineId());
         MidCaptureMatchRuntime match = new MidCaptureMatchRuntime(
             sessionSpec.matchId(),
             worldName,
             sessionSpec.queueId(),
             sessionSpec.arenaId(),
             sessionSpec.rulesEngineId(),
-            sessionSpec.matchResolutionTriggerId(),
             sessionSpec.expectedPlayerUuids(),
             sessionSpec.requiredResultPlayerUuids(),
             controlledByThisMod
@@ -290,6 +315,7 @@ public final class MidCaptureMinigameService {
         @Nonnull String playerName,
         long nowEpochMs
     ) {
+        pendingPlacementMatchIdByPlayerUuid.remove(playerUuid);
         String previousMatchId = matchIdByPlayerUuid.put(playerUuid, match.getMatchId());
         if (previousMatchId != null && !previousMatchId.equalsIgnoreCase(match.getMatchId())) {
             detachPlayerFromMatch(previousMatchId, playerUuid);
@@ -322,16 +348,21 @@ public final class MidCaptureMinigameService {
         match.updatePlacement(expectedPlayers, arrivedPlayers, placedPlayers, placementComplete);
     }
 
-    private boolean isManualResolutionTrigger(@Nonnull String rawTriggerId) {
-        return rawTriggerId.isBlank() || "none".equalsIgnoreCase(rawTriggerId);
-    }
-
     private void forgetPlayer(@Nonnull UUID playerUuid) {
+        pendingPlacementMatchIdByPlayerUuid.remove(playerUuid);
         String matchId = matchIdByPlayerUuid.remove(playerUuid);
         if (matchId == null || matchId.isBlank()) {
             return;
         }
         detachPlayerFromMatch(matchId, playerUuid);
+    }
+
+    private boolean hasPendingPlacement(@Nonnull UUID playerUuid) {
+        String matchId = pendingPlacementMatchIdByPlayerUuid.get(playerUuid);
+        if (matchId == null || matchId.isBlank()) {
+            return false;
+        }
+        return matchesById.containsKey(matchId);
     }
 
     private void detachPlayerFromMatch(@Nonnull String matchId, @Nonnull UUID playerUuid) {
@@ -403,7 +434,6 @@ public final class MidCaptureMinigameService {
         String queueId,
         String arenaId,
         String rulesEngineId,
-        String matchResolutionTriggerId,
         List<UUID> expectedPlayerUuids,
         List<UUID> requiredResultPlayerUuids
     ) {

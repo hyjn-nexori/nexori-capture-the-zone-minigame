@@ -226,7 +226,6 @@ public final class CaptureTheZoneNexoriIntegration implements MidCaptureIntegrat
             event.queueId(),
             event.arenaId(),
             event.rulesEngineId(),
-            event.matchResolutionTriggerId(),
             event.expectedPlayerUuids(),
             event.requiredResultPlayerUuids()
         );
@@ -261,18 +260,23 @@ public final class CaptureTheZoneNexoriIntegration implements MidCaptureIntegrat
         @Override
         public void onPlayerArrived(@Nonnull NexoriPlayerMatchLifecycleEvent event) {
             midCaptureService.createOrUpdateSession(toSessionSpec(event.match()), worldName(event.match()), event.eventAtEpochMs());
-            midCaptureService.addPlayerToSession(
-                event.match().matchId(),
-                event.playerUuid(),
-                event.playerName().isBlank() ? event.playerUuid().toString() : event.playerName(),
-                event.eventAtEpochMs()
-            );
+            midCaptureService.markPlayerPlacementPending(event.match().matchId(), event.playerUuid(), event.eventAtEpochMs());
             applyPlacement(event.match());
         }
 
         @Override
         public void onPlayerPlacementConfirmed(@Nonnull NexoriPlayerPlacementLifecycleEvent event) {
-            applyPlacement(event.player().match());
+            NexoriPlayerMatchLifecycleEvent playerEvent = event.player();
+            NexoriMatchLifecycleEvent matchEvent = playerEvent.match();
+            String placementWorldName = event.worldName().isBlank() ? worldName(matchEvent) : event.worldName();
+            midCaptureService.createOrUpdateSession(toSessionSpec(matchEvent), placementWorldName, event.eventAtEpochMs());
+            midCaptureService.addPlayerToSession(
+                matchEvent.matchId(),
+                playerEvent.playerUuid(),
+                playerEvent.playerName().isBlank() ? playerEvent.playerUuid().toString() : playerEvent.playerName(),
+                event.eventAtEpochMs()
+            );
+            applyPlacement(matchEvent);
         }
 
         @Override

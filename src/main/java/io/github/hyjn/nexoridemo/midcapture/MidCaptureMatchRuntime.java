@@ -16,7 +16,6 @@ final class MidCaptureMatchRuntime {
     private final String queueId;
     private final String arenaId;
     private final String rulesEngineId;
-    private final String matchResolutionTriggerId;
     private final boolean controlledByThisMod;
     private String worldName;
     private long lastAdvanceAtEpochMs;
@@ -34,7 +33,6 @@ final class MidCaptureMatchRuntime {
         @Nonnull String queueId,
         @Nonnull String arenaId,
         @Nonnull String rulesEngineId,
-        @Nonnull String matchResolutionTriggerId,
         @Nonnull List<UUID> expectedPlayerUuids,
         @Nonnull List<UUID> requiredResultPlayerUuids,
         boolean controlledByThisMod
@@ -44,7 +42,6 @@ final class MidCaptureMatchRuntime {
         this.queueId = queueId;
         this.arenaId = arenaId;
         this.rulesEngineId = rulesEngineId;
-        this.matchResolutionTriggerId = matchResolutionTriggerId;
         this.expectedPlayerUuids = List.copyOf(expectedPlayerUuids);
         this.requiredResultPlayerUuids = List.copyOf(requiredResultPlayerUuids);
         this.controlledByThisMod = controlledByThisMod;
@@ -92,11 +89,6 @@ final class MidCaptureMatchRuntime {
     @Nonnull
     String getRulesEngineId() {
         return rulesEngineId;
-    }
-
-    @Nonnull
-    String getMatchResolutionTriggerId() {
-        return matchResolutionTriggerId;
     }
 
     boolean isControlledByThisMod() {

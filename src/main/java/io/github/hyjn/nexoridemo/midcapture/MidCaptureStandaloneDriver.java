@@ -59,7 +59,6 @@ public final class MidCaptureStandaloneDriver {
             "local",
             "local",
             MidCaptureRulesEngine.RULES_ENGINE_ID,
-            "none",
             List.of(playerUuid),
             List.of(playerUuid)
         );

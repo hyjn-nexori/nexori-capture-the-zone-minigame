@@ -67,7 +67,6 @@ The most important calls for this demo are:
 - `findActivePlayerUuid(...)`
 - `findMatchPlacementState(...)`
 - `resolvePlayerOutcome(...)`
-- `findMatchResolutionTriggerId(...)`
 
 ## Project Structure
 
