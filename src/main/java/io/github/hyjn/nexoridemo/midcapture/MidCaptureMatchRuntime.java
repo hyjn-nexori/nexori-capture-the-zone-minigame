@@ -24,6 +24,9 @@ final class MidCaptureMatchRuntime {
     private int arrivedPlayers;
     private int placedPlayers;
     private boolean placementComplete;
+    private boolean startAllowed;
+    private long startedAtEpochMs;
+    private String startReason = "";
     private MidCaptureZoneState zoneState = MidCaptureZoneState.PREPARING;
     private UUID capturingPlayerUuid;
 
@@ -127,12 +130,46 @@ final class MidCaptureMatchRuntime {
         return placementComplete;
     }
 
+    /**
+     * True once Nexori has opened the start gate ({@code onMatchStartAllowed}). This is the official
+     * signal that real gameplay may begin, and it can be true with a partial roster (placement not
+     * complete) when the initial placement window expired with enough players.
+     */
+    boolean isStartAllowed() {
+        return startAllowed;
+    }
+
+    long getStartedAtEpochMs() {
+        return startedAtEpochMs;
+    }
+
+    @Nonnull
+    String getStartReason() {
+        return startReason;
+    }
+
+    /**
+     * Marks the match as start-allowed. Idempotent: only the first call records the start time and
+     * reason and returns {@code true}; later calls are no-ops so the match is never restarted.
+     */
+    boolean markStartAllowed(@Nonnull String reason, long nowEpochMs) {
+        if (startAllowed) {
+            return false;
+        }
+        startAllowed = true;
+        startedAtEpochMs = nowEpochMs;
+        startReason = reason;
+        return true;
+    }
+
     void updatePlacement(int expectedPlayers, int arrivedPlayers, int placedPlayers, boolean placementComplete) {
         this.expectedPlayers = expectedPlayers;
         this.arrivedPlayers = arrivedPlayers;
         this.placedPlayers = placedPlayers;
         this.placementComplete = placementComplete;
-        if (!placementComplete) {
+        // Only reset the zone while the match has not started yet. Once the start gate is open,
+        // later placement updates (e.g. backfill arrivals) must not wipe live capture progress.
+        if (!placementComplete && !startAllowed) {
             this.zoneState = MidCaptureZoneState.PREPARING;
             this.capturingPlayerUuid = null;
         }

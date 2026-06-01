@@ -101,7 +101,7 @@ public final class MidCaptureMinigameService {
                 nowEpochMs,
                 "world_mismatch matchId=" + match.getMatchId() + " current=" + world.getName() + " expected=" + expectedWorldName
             );
-            if (!match.isPlacementComplete() || hasPendingPlacement(playerRef.getUuid())) {
+            if (!match.isStartAllowed() || hasPendingPlacement(playerRef.getUuid())) {
                 return;
             }
             forgetPlayer(playerRef.getUuid());
@@ -110,7 +110,9 @@ public final class MidCaptureMinigameService {
 
         match.setWorldName(world.getName());
         MidCapturePlayerRuntime playerRuntime = addPlayerToSession(match, playerRef.getUuid(), playerRef.getUsername(), nowEpochMs);
-        if (!match.isPlacementComplete()) {
+        // Gameplay begins on the Nexori start gate (onMatchStartAllowed), not on full placement.
+        // This lets the match start with a partial roster once the initial window expires.
+        if (!match.isStartAllowed()) {
             rulesEngine.onWaitingForPlacement(match);
             return;
         }
@@ -186,6 +188,9 @@ public final class MidCaptureMinigameService {
             match.getArrivedPlayers(),
             match.getPlacedPlayers(),
             match.isPlacementComplete(),
+            match.isStartAllowed(),
+            match.getStartedAtEpochMs(),
+            match.getStartReason(),
             playerRuntime.isHomeRespawnConfigured(),
             playerRuntime.getCaptureProgressSeconds(),
             insideZone,
@@ -248,6 +253,39 @@ public final class MidCaptureMinigameService {
             return;
         }
         updatePlayerPlacementState(match, expectedPlayers, arrivedPlayers, placedPlayers, placementComplete);
+    }
+
+    /**
+     * Marks the match as start-allowed in response to Nexori's start gate
+     * ({@code onMatchStartAllowed}). Idempotent: repeated calls do not restart the match or reset
+     * state. The session is expected to already exist (the integration creates/updates it first);
+     * if it does not, this is a safe no-op.
+     */
+    public synchronized void markStartAllowed(
+        @Nonnull String matchId,
+        @Nonnull String reason,
+        long nowEpochMs
+    ) {
+        String normalizedMatchId = matchId.trim();
+        MidCaptureMatchRuntime match = normalizedMatchId.isBlank() ? null : matchesById.get(normalizedMatchId);
+        if (match == null) {
+            logger.atWarning().log(
+                "MID_CAPTURE_START_ALLOWED_NO_SESSION matchId=" + normalizedMatchId + " reason=" + reason
+            );
+            return;
+        }
+        if (!match.isControlledByThisMod()) {
+            return;
+        }
+        if (match.markStartAllowed(reason, nowEpochMs)) {
+            logger.atInfo().log(
+                "MID_CAPTURE_START_ALLOWED matchId=" + match.getMatchId()
+                    + " reason=" + reason
+                    + " expectedPlayers=" + match.getExpectedPlayers()
+                    + " placedPlayers=" + match.getPlacedPlayers()
+                    + " placementComplete=" + match.isPlacementComplete()
+            );
+        }
     }
 
     public synchronized void closeSession(@Nonnull String matchId, @Nonnull String reason, long nowEpochMs) {
@@ -451,6 +489,9 @@ public final class MidCaptureMinigameService {
         int arrivedPlayers,
         int placedPlayers,
         boolean placementComplete,
+        boolean startAllowed,
+        long startedAtEpochMs,
+        String startReason,
         boolean homeRespawnConfigured,
         double captureProgressSeconds,
         boolean insideCaptureZone,

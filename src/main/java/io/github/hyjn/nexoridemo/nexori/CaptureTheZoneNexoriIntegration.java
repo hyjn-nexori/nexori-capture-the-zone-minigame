@@ -281,8 +281,32 @@ public final class CaptureTheZoneNexoriIntegration implements MidCaptureIntegrat
 
         @Override
         public void onMatchPlacementCompleted(@Nonnull NexoriMatchLifecycleEvent event) {
+            // Informational/compat path: a full roster also opens the start gate, so route through
+            // the same idempotent helper. onMatchStartAllowed remains the primary gameplay trigger.
+            applyStartAllowed(event);
+        }
+
+        @Override
+        public void onMatchStartAllowed(@Nonnull NexoriMatchLifecycleEvent event) {
+            // Primary signal that real gameplay may begin. Fires when all expected players are
+            // placed, or when the initial placement window expired with enough players (partial
+            // roster). Idempotent via MidCaptureMinigameService.markStartAllowed.
+            applyStartAllowed(event);
+        }
+
+        private void applyStartAllowed(@Nonnull NexoriMatchLifecycleEvent event) {
             midCaptureService.createOrUpdateSession(toSessionSpec(event), worldName(event), event.eventAtEpochMs());
             applyPlacement(event);
+            midCaptureService.markStartAllowed(event.matchId(), resolveStartReason(event), event.eventAtEpochMs());
+        }
+
+        @Nonnull
+        private String resolveStartReason(@Nonnull NexoriMatchLifecycleEvent event) {
+            NexoriMatchPlacementState placementState = event.placementState();
+            if (placementState != null && !placementState.startGateOpenReason().isBlank()) {
+                return placementState.startGateOpenReason();
+            }
+            return "NEXORI_MATCH_START_ALLOWED";
         }
 
         @Override

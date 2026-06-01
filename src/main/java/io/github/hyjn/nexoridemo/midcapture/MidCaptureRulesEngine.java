@@ -159,7 +159,7 @@ final class MidCaptureRulesEngine {
             );
         }
 
-        if (!match.isPlacementComplete()) {
+        if (!match.isStartAllowed()) {
             return MidCaptureHudSnapshot.of(
                 "MID CONTROL",
                 "Placed " + match.getPlacedPlayers() + " / " + Math.max(match.getExpectedPlayers(), 1),
@@ -246,7 +246,7 @@ final class MidCaptureRulesEngine {
         @Nonnull Player player,
         @Nonnull TransformComponent transformComponent
     ) {
-        if (!match.isPlacementComplete() || playerRuntime.isHomeRespawnConfigured()) {
+        if (!match.isStartAllowed() || playerRuntime.isHomeRespawnConfigured()) {
             return;
         }
 
@@ -418,7 +418,7 @@ final class MidCaptureRulesEngine {
         }
         match.setLastAdvanceAtEpochMs(nowEpochMs);
 
-        if (!match.isPlacementComplete()) {
+        if (!match.isStartAllowed()) {
             return;
         }
 
