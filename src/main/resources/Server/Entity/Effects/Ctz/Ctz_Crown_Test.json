@@ -1,0 +1,7 @@
+{
+  "ApplicationEffects": {
+    "ModelVFXId": "Crown_Gold"
+  },
+  "OverlapBehavior": "Overwrite",
+  "Infinite": true
+}

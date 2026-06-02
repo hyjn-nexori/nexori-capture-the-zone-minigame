@@ -52,6 +52,8 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
 
         this.getCommandRegistry().registerCommand(new NexoriPublicApiSpectatorCommand(this.midCaptureMinigameService));
         this.getCommandRegistry().registerCommand(new MidCaptureLocalCommand(this.standaloneDriver));
+        // Phase 1 debug-only leader marker prototype command. Admin-gated by an explicit permission node.
+        this.getCommandRegistry().registerCommand(new CtzLeaderMarkerDebugCommand(this.getLogger()));
         this.getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, event -> {
             if (event.getPlayerRef() == null || event.getPlayerRef().getUuid() == null) {
                 return;
