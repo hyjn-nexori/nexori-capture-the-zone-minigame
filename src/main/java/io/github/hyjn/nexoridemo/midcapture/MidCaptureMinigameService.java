@@ -11,6 +11,7 @@ import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import io.github.hyjn.nexoridemo.midcapture.events.MidCaptureMatchCreatedEvent;
+import io.github.hyjn.nexoridemo.midcapture.events.MidCaptureMatchFinishedEvent;
 import io.github.hyjn.nexoridemo.midcapture.events.MidCapturePlayerBecameSpectatorEvent;
 import io.github.hyjn.nexoridemo.midcapture.events.MidCapturePlayerJoinedEvent;
 import io.github.hyjn.nexoridemo.midcapture.events.MidCapturePlayerLeftEvent;
@@ -29,6 +30,7 @@ public final class MidCaptureMinigameService {
     private static final long TICK_EXIT_LOG_INTERVAL_MS = 3_000L;
 
     private final MidCaptureRulesEngine rulesEngine;
+    private final MidCaptureLeaderMarker leaderMarker;
     private final HytaleLogger logger;
     private final MidCaptureEventBus eventBus;
     private final Map<String, MidCaptureMatchRuntime> matchesById = new LinkedHashMap<>();
@@ -47,6 +49,14 @@ public final class MidCaptureMinigameService {
         this.logger = logger;
         this.eventBus = eventBus;
         this.rulesEngine = new MidCaptureRulesEngine(logger, eventBus);
+        this.leaderMarker = new MidCaptureLeaderMarker(logger);
+        // Clear the leader marker the moment a winner is resolved, before players are returned to lobby.
+        this.eventBus.register(MidCaptureMatchFinishedEvent.class, event -> {
+            MidCaptureMatchRuntime finished = matchesById.get(event.matchId());
+            if (finished != null) {
+                leaderMarker.clearMarker(finished);
+            }
+        });
     }
 
     public synchronized void handlePlayerTick(
@@ -119,6 +129,8 @@ public final class MidCaptureMinigameService {
 
         rulesEngine.onPlayerTick(match, playerRuntime, player, ref, store, commandBuffer, nowEpochMs);
         rulesEngine.onGameTick(match, nowEpochMs);
+        // Mark the highest-progress player with the visual leader effects (throttled, no-op unless lead changes).
+        leaderMarker.reconcile(match, nowEpochMs);
     }
 
     public synchronized void handlePlayerDisconnect(@Nonnull UUID playerUuid) {
@@ -293,6 +305,8 @@ public final class MidCaptureMinigameService {
         if (match == null) {
             return;
         }
+        // Best-effort removal of the leader marker before the session goes away.
+        leaderMarker.clearMarker(match);
         List<UUID> playerUuids = List.copyOf(match.getPlayersByUuid().keySet());
         for (UUID playerUuid : playerUuids) {
             matchIdByPlayerUuid.remove(playerUuid);
@@ -413,6 +427,8 @@ public final class MidCaptureMinigameService {
         if (removed == null) {
             return;
         }
+        // If the leaving player held the marker, remove its effects; reconcile re-picks a leader next tick.
+        leaderMarker.onPlayerLeft(match, playerUuid);
         long nowEpochMs = System.currentTimeMillis();
         eventBus.publish(new MidCapturePlayerLeftEvent(
             match.getMatchId(),

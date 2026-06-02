@@ -29,6 +29,9 @@ final class MidCaptureMatchRuntime {
     private String startReason = "";
     private MidCaptureZoneState zoneState = MidCaptureZoneState.PREPARING;
     private UUID capturingPlayerUuid;
+    private UUID markedLeaderUuid;
+    private long lastLeaderReconcileAtEpochMs;
+    private long lastLeaderMarkerEnsureAtEpochMs;
 
     MidCaptureMatchRuntime(
         @Nonnull String matchId,
@@ -191,5 +194,35 @@ final class MidCaptureMatchRuntime {
 
     void setCapturingPlayerUuid(@Nullable UUID capturingPlayerUuid) {
         this.capturingPlayerUuid = capturingPlayerUuid;
+    }
+
+    /** Player currently wearing the visual leader marker effects, or null if nobody is marked. */
+    @Nullable
+    UUID getMarkedLeaderUuid() {
+        return markedLeaderUuid;
+    }
+
+    void setMarkedLeaderUuid(@Nullable UUID markedLeaderUuid) {
+        this.markedLeaderUuid = markedLeaderUuid;
+    }
+
+    long getLastLeaderReconcileAtEpochMs() {
+        return lastLeaderReconcileAtEpochMs;
+    }
+
+    void setLastLeaderReconcileAtEpochMs(long lastLeaderReconcileAtEpochMs) {
+        this.lastLeaderReconcileAtEpochMs = lastLeaderReconcileAtEpochMs;
+    }
+
+    /**
+     * Epoch ms of the last "ensure" check that verifies the current leader still has the crown effect
+     * (re-applying it only if it was lost, e.g. to death/respawn). Throttle only — not a forced refresh.
+     */
+    long getLastLeaderMarkerEnsureAtEpochMs() {
+        return lastLeaderMarkerEnsureAtEpochMs;
+    }
+
+    void setLastLeaderMarkerEnsureAtEpochMs(long lastLeaderMarkerEnsureAtEpochMs) {
+        this.lastLeaderMarkerEnsureAtEpochMs = lastLeaderMarkerEnsureAtEpochMs;
     }
 }
