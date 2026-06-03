@@ -31,6 +31,7 @@ public final class MidCaptureMinigameService {
 
     private final MidCaptureRulesEngine rulesEngine;
     private final MidCaptureLeaderMarker leaderMarker;
+    private final MidCaptureZoneMarkerService zoneMarker;
     private final HytaleLogger logger;
     private final MidCaptureEventBus eventBus;
     private final Map<String, MidCaptureMatchRuntime> matchesById = new LinkedHashMap<>();
@@ -50,6 +51,7 @@ public final class MidCaptureMinigameService {
         this.eventBus = eventBus;
         this.rulesEngine = new MidCaptureRulesEngine(logger, eventBus);
         this.leaderMarker = new MidCaptureLeaderMarker(logger);
+        this.zoneMarker = new MidCaptureZoneMarkerService(logger);
         // Clear the leader marker the moment a winner is resolved, before players are returned to lobby.
         this.eventBus.register(MidCaptureMatchFinishedEvent.class, event -> {
             MidCaptureMatchRuntime finished = matchesById.get(event.matchId());
@@ -131,6 +133,8 @@ public final class MidCaptureMinigameService {
         rulesEngine.onGameTick(match, nowEpochMs);
         // Mark the highest-progress player with the visual leader effects (throttled, no-op unless lead changes).
         leaderMarker.reconcile(match, nowEpochMs);
+        // Keep the capture zone visible with the cyan rings (throttled re-emit; stops at match end).
+        zoneMarker.reconcile(match, world, store, nowEpochMs);
     }
 
     public synchronized void handlePlayerDisconnect(@Nonnull UUID playerUuid) {

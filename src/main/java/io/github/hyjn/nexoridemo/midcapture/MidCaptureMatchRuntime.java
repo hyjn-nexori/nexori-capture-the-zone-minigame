@@ -32,6 +32,7 @@ final class MidCaptureMatchRuntime {
     private UUID markedLeaderUuid;
     private long lastLeaderReconcileAtEpochMs;
     private long lastLeaderMarkerEnsureAtEpochMs;
+    private long lastZoneMarkerEmitAtEpochMs;
 
     MidCaptureMatchRuntime(
         @Nonnull String matchId,
@@ -224,5 +225,14 @@ final class MidCaptureMatchRuntime {
 
     void setLastLeaderMarkerEnsureAtEpochMs(long lastLeaderMarkerEnsureAtEpochMs) {
         this.lastLeaderMarkerEnsureAtEpochMs = lastLeaderMarkerEnsureAtEpochMs;
+    }
+
+    /** Epoch ms of the last zone-marker particle (re)emission. Throttle for periodic re-emit. */
+    long getLastZoneMarkerEmitAtEpochMs() {
+        return lastZoneMarkerEmitAtEpochMs;
+    }
+
+    void setLastZoneMarkerEmitAtEpochMs(long lastZoneMarkerEmitAtEpochMs) {
+        this.lastZoneMarkerEmitAtEpochMs = lastZoneMarkerEmitAtEpochMs;
     }
 }
