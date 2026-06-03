@@ -1,0 +1,15 @@
+{
+  "$Comment": "CTZ zone visual prototype: static outline-only ground circumference. References the demo's own Ctz_Zone_Ring_Spawner. No lines, sparks, wind, beam, glow, fill, or floating particles. Must use the .particlesystem extension.",
+  "Spawners": [
+    {
+      "SpawnerId": "Ctz_Zone_Ring_Spawner",
+      "PositionOffset": {
+        "Z": 0
+      },
+      "FixedRotation": false,
+      "StartDelay": 0.0
+    }
+  ],
+  "LifeSpan": 9,
+  "CullDistance": 100
+}

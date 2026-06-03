@@ -54,6 +54,8 @@ public final class NexoriPublicApiDemoPlugin extends JavaPlugin {
         this.getCommandRegistry().registerCommand(new MidCaptureLocalCommand(this.standaloneDriver));
         // Phase 1 debug-only leader marker prototype command. Admin-gated by an explicit permission node.
         this.getCommandRegistry().registerCommand(new CtzLeaderMarkerDebugCommand(this.getLogger()));
+        // Debug-only zone-visual prototype command (spawns a stock ParticleSystem at the CTZ zone centre).
+        this.getCommandRegistry().registerCommand(new CtzZoneMarkerDebugCommand(this.getLogger()));
         this.getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, event -> {
             if (event.getPlayerRef() == null || event.getPlayerRef().getUuid() == null) {
                 return;

@@ -96,11 +96,33 @@ final class MidCaptureRulesEngine {
         }
     }
 
+    /**
+     * A player is inside the capture zone when they are within the vertical band AND within the
+     * horizontal circle. Height and radius are evaluated separately so the horizontal test can be a
+     * true circle (matching the circular {@code Totem_Heal_Simple_Test} visual) while the vertical
+     * band stays a simple min/max range.
+     */
     boolean isInsideCaptureZone(@Nonnull Vector3d position) {
-        return Math.abs(position.x - MidCaptureConfig.CAPTURE_CENTER_X) <= MidCaptureConfig.CAPTURE_RADIUS_XZ
-            && Math.abs(position.z - MidCaptureConfig.CAPTURE_CENTER_Z) <= MidCaptureConfig.CAPTURE_RADIUS_XZ
-            && position.y >= MidCaptureConfig.CAPTURE_MIN_Y
+        return isWithinCaptureHeight(position) && isWithinCaptureRadius(position);
+    }
+
+    /** Vertical band check only: unchanged Y range [{@code CAPTURE_MIN_Y}, {@code CAPTURE_MAX_Y}]. */
+    boolean isWithinCaptureHeight(@Nonnull Vector3d position) {
+        return position.y >= MidCaptureConfig.CAPTURE_MIN_Y
             && position.y <= MidCaptureConfig.CAPTURE_MAX_Y;
+    }
+
+    /**
+     * Horizontal circle check only (X/Z). Uses squared distance to avoid a sqrt:
+     * {@code dx*dx + dz*dz <= radius*radius}. This replaces the old square AABB test, so positions in
+     * the former AABB corners (outside the inscribed circle) now correctly count as OUTSIDE the zone —
+     * which is expected and makes the logical zone match the circular visual.
+     */
+    boolean isWithinCaptureRadius(@Nonnull Vector3d position) {
+        double dx = position.x - MidCaptureConfig.CAPTURE_CENTER_X;
+        double dz = position.z - MidCaptureConfig.CAPTURE_CENTER_Z;
+        double radius = MidCaptureConfig.CAPTURE_RADIUS_XZ;
+        return (dx * dx + dz * dz) <= (radius * radius);
     }
 
     @Nonnull
