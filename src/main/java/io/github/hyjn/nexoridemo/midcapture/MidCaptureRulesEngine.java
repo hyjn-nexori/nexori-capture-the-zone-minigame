@@ -181,18 +181,8 @@ final class MidCaptureRulesEngine {
             );
         }
 
-        if (!match.isStartAllowed()) {
-            return MidCaptureHudSnapshot.of(
-                "MID CONTROL",
-                "Placed " + match.getPlacedPlayers() + " / " + Math.max(match.getExpectedPlayers(), 1),
-                "#82C7FF",
-                playerLines,
-                respawnPenaltyText,
-                respawnRewardText,
-                respawnRewardColor
-            );
-        }
-
+        // Placement waiting is now owned by Nexori's blue "waiting for players" card; the minigame HUD
+        // is suppressed until the match starts (see MidCaptureMinigameService.findHudSnapshot).
         return MidCaptureHudSnapshot.of(
             "MID CONTROL",
             buildZoneStatusText(match),

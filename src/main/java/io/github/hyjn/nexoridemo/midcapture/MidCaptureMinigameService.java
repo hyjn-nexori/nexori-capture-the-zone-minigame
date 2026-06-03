@@ -171,6 +171,11 @@ public final class MidCaptureMinigameService {
         if (match == null || match.isResolved()) {
             return Optional.empty();
         }
+        // During the initial placement window, Nexori shows the blue "waiting for players" card.
+        // The minigame HUD only appears once the match has actually started (start gate open).
+        if (!match.isStartAllowed()) {
+            return Optional.empty();
+        }
 
         MidCapturePlayerRuntime playerRuntime = match.getPlayersByUuid().get(playerUuid);
         if (playerRuntime == null) {
