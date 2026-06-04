@@ -342,6 +342,10 @@ public final class MidCaptureMinigameService {
         MidCaptureMatchRuntime existing = matchesById.get(sessionSpec.matchId());
         if (existing != null) {
             existing.setWorldName(worldName);
+            existing.updateRosters(
+                sessionSpec.expectedPlayerUuids(),
+                sessionSpec.requiredResultPlayerUuids()
+            );
             return existing;
         }
 

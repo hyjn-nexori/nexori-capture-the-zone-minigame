@@ -2,8 +2,9 @@ package io.github.hyjn.nexoridemo.midcapture;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -11,8 +12,8 @@ final class MidCaptureMatchRuntime {
 
     private final String matchId;
     private final Map<UUID, MidCapturePlayerRuntime> playersByUuid = new LinkedHashMap<>();
-    private final List<UUID> expectedPlayerUuids;
-    private final List<UUID> requiredResultPlayerUuids;
+    private List<UUID> expectedPlayerUuids;
+    private List<UUID> requiredResultPlayerUuids;
     private final String queueId;
     private final String arenaId;
     private final String rulesEngineId;
@@ -49,8 +50,7 @@ final class MidCaptureMatchRuntime {
         this.queueId = queueId;
         this.arenaId = arenaId;
         this.rulesEngineId = rulesEngineId;
-        this.expectedPlayerUuids = List.copyOf(expectedPlayerUuids);
-        this.requiredResultPlayerUuids = List.copyOf(requiredResultPlayerUuids);
+        updateRosters(expectedPlayerUuids, requiredResultPlayerUuids);
         this.controlledByThisMod = controlledByThisMod;
     }
 
@@ -72,6 +72,14 @@ final class MidCaptureMatchRuntime {
     @Nonnull
     List<UUID> getRequiredResultPlayerUuids() {
         return requiredResultPlayerUuids;
+    }
+
+    public void updateRosters(
+        @Nonnull List<UUID> expectedPlayerUuids,
+        @Nonnull List<UUID> requiredResultPlayerUuids
+    ) {
+        this.expectedPlayerUuids = normalizeRoster(expectedPlayerUuids);
+        this.requiredResultPlayerUuids = normalizeRoster(requiredResultPlayerUuids);
     }
 
     @Nonnull
@@ -234,5 +242,16 @@ final class MidCaptureMatchRuntime {
 
     void setLastZoneMarkerEmitAtEpochMs(long lastZoneMarkerEmitAtEpochMs) {
         this.lastZoneMarkerEmitAtEpochMs = lastZoneMarkerEmitAtEpochMs;
+    }
+
+    @Nonnull
+    private static List<UUID> normalizeRoster(@Nonnull List<UUID> playerUuids) {
+        LinkedHashSet<UUID> deduplicated = new LinkedHashSet<>();
+        for (UUID playerUuid : playerUuids) {
+            if (playerUuid != null) {
+                deduplicated.add(playerUuid);
+            }
+        }
+        return List.copyOf(deduplicated);
     }
 }
